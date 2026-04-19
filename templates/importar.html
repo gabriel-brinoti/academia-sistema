@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Importar Alunos - DL Fit</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="navbar">
+    <div class="navbar-brand">
+        <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
+        <h1>DL Fit Admin</h1>
+    </div>
+    <div class="navbar-links">
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('alunos') }}">Alunos</a>
+    </div>
+</div>
+
+<div class="form-box">
+    <h1 class="section-title">Importar Alunos via Excel</h1>
+    <p class="subtitulo">Formato esperado: Nome | Telefone | Plano | Vencimento | Status</p>
+
+    {% if erro %}
+        <p class="erro">{{ erro }}</p>
+    {% endif %}
+
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="arquivo" required>
+        <button type="submit">Importar</button>
+    </form>
+
+    <div class="footer-actions">
+        <a href="{{ url_for('dashboard') }}" class="btn-voltar">Voltar</a>
+    </div>
+</div>
+</body>
+</html>

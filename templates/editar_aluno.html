@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Editar Aluno - DL Fit</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="navbar">
+    <div class="navbar-brand">
+        <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
+        <h1>DL Fit Admin</h1>
+    </div>
+    <div class="navbar-links">
+        <a href="{{ url_for('alunos') }}">Alunos</a>
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+    </div>
+</div>
+
+<div class="form-box">
+    <h1 class="section-title">Editar Aluno</h1>
+    <p class="subtitulo">Atualize os dados do aluno</p>
+
+    <form method="POST">
+        <input type="text" name="nome" value="{{ aluno.nome }}" required>
+        <input type="text" name="telefone" value="{{ aluno.telefone }}" required>
+        <input type="text" name="plano" value="{{ aluno.plano }}" required>
+        <input type="date" name="vencimento" value="{{ aluno.vencimento }}" required>
+        <label>Status do pagamento</label>
+        <select name="status_pagamento" required>
+            <option value="Pago" {% if aluno.status_pagamento == 'Pago' %}selected{% endif %}>Pago</option>
+            <option value="Pendente" {% if aluno.status_pagamento == 'Pendente' %}selected{% endif %}>Pendente</option>
+            <option value="Atrasado" {% if aluno.status_pagamento == 'Atrasado' %}selected{% endif %}>Atrasado</option>
+        </select>
+        <textarea name="observacao" placeholder="Observações">{{ aluno.observacao }}</textarea>
+        <button type="submit">Atualizar</button>
+    </form>
+
+    <div class="footer-actions">
+        <a href="{{ url_for('alunos') }}" class="btn-voltar">Voltar</a>
+    </div>
+</div>
+</body>
+</html>

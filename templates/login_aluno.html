@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Área do Aluno - DL Fit</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="login-box">
+    <div class="logo-center">
+        <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
+    </div>
+
+    <h1 class="section-title">Área do Aluno</h1>
+    <p class="subtitulo">Consulte seu plano, status e agende sua aula</p>
+
+    {% if erro %}
+        <p class="erro">{{ erro }}</p>
+    {% endif %}
+
+    <form method="POST">
+        <input type="text" name="usuario" placeholder="Usuário" required>
+        <input type="password" name="senha" placeholder="Senha" required>
+        <button type="submit">Entrar</button>
+    </form>
+
+    <div class="footer-actions">
+        <a href="{{ url_for('login') }}" class="btn-voltar">Sou administrador</a>
+    </div>
+</div>
+</body>
+</html>

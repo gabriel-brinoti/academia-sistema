@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel do Aluno - DL Fit</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="navbar">
+    <div class="navbar-brand">
+        <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
+        <h1>Área do Aluno</h1>
+    </div>
+    <div class="navbar-links">
+        <a href="{{ url_for('cronograma') }}">Cronograma</a>
+        <a href="{{ url_for('logout_aluno') }}">Sair</a>
+    </div>
+</div>
+
+<div class="container">
+    <h2 class="section-title">Bem-vindo, {{ aluno.nome }}</h2>
+    <p class="subtitulo">Resumo do seu cadastro e das aulas</p>
+
+    <div class="cards">
+        <div class="card"><p>Plano</p><h2>{{ aluno.plano }}</h2></div>
+        <div class="card"><p>Vencimento</p><h2>{{ aluno.vencimento }}</h2></div>
+        <div class="card"><p>Status</p><h2 class="{{ aluno.status_pagamento|lower }}">{{ aluno.status_pagamento }}</h2></div>
+        <div class="card"><p>Aulas Restantes</p><h2>{{ aluno.aulas_restantes }}</h2></div>
+    </div>
+
+    <h2 class="schedule-title">Cronograma do Dia</h2>
+    {% for aula in aulas_hoje %}
+    <div class="aula-card">
+        <div class="aula-linha">{{ aula.horario }} - {{ aula.modalidade }}</div>
+        <div class="progress"><div class="progress-bar" style="width: {{ aula.percentual }}%;"></div></div>
+        <div class="aula-info">{{ aula.ocupadas }} / {{ aula.capacidade }} vagas ocupadas — Restam {{ aula.restantes }}</div>
+
+        {% if aula.lotada %}
+            <button class="btn-danger" disabled>Lotado</button>
+        {% elif aluno.aulas_restantes <= 0 %}
+            <button class="btn-danger" disabled>Sem aulas</button>
+        {% else %}
+            <form method="POST" action="{{ url_for('agendar_aula', aula_id=aula.id) }}">
+                <button type="submit">Agendar</button>
+            </form>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+</body>
+</html>

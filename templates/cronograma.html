@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Cronograma - DL Fit</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="navbar">
+    <div class="navbar-brand">
+        <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
+        <h1>DL Fit</h1>
+    </div>
+    <div class="navbar-links">
+        <a href="{{ url_for('login') }}">Admin</a>
+    </div>
+</div>
+
+<div class="container">
+    <h2 class="schedule-title">Cronograma do Dia</h2>
+
+    {% if aulas_hoje %}
+        {% for aula in aulas_hoje %}
+        <div class="aula-card">
+            <div class="aula-linha">
+                {{ aula.horario }} - {{ aula.modalidade }}
+            </div>
+
+            <div class="progress">
+                <div class="progress-bar" style="width: {{ aula.percentual }}%;"></div>
+            </div>
+
+            <div class="aula-info">
+                {{ aula.ocupadas }} / {{ aula.capacidade }} vagas ocupadas — Restam {{ aula.restantes }}
+            </div>
+
+            {% if aula.lotada %}
+                <button class="btn-danger" disabled>Lotado</button>
+            {% else %}
+                <form method="POST" action="{{ url_for('agendar_aula', aula_id=aula.id) }}">
+                    <select name="aluno_id" required>
+                        <option value="">Selecione seu nome</option>
+                        {% for aluno in alunos %}
+                            <option value="{{ aluno.id }}">{{ aluno.nome }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit">Entrar na aula</button>
+                </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="aula-card">
+            <div class="aula-info">Não há aulas cadastradas para hoje.</div>
+        </div>
+    {% endif %}
+</div>
+</body>
+</html>

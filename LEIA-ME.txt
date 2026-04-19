@@ -1,0 +1,9 @@
+SUBSTITUA ESTES ARQUIVOS NO PROJETO:
+
+1) app.py  -> na raiz do projeto
+2) login.html -> dentro da pasta templates
+3) cronograma.html -> dentro da pasta templates
+4) agendamento_sucesso.html -> dentro da pasta templates
+
+IMPORTANTE:
+Se o cronograma não aparecer, apague o arquivo academia.db e rode o sistema de novo.

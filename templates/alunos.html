@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Alunos - DL Fit</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="navbar">
+    <div class="navbar-brand">
+        <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
+        <h1>DL Fit Admin</h1>
+    </div>
+    <div class="navbar-links">
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('novo_aluno') }}">Novo Aluno</a>
+        <a href="{{ url_for('importar_excel') }}">Importar</a>
+        <a href="{{ url_for('logout') }}">Sair</a>
+    </div>
+</div>
+
+<div class="container">
+    <h2 class="section-title">Lista de Alunos</h2>
+    <p class="subtitulo">Listagem e busca de alunos</p>
+
+    <form method="GET" class="busca-box">
+        <input type="text" name="busca" placeholder="Buscar por nome..." value="{{ busca }}">
+        <button type="submit">Buscar</button>
+    </form>
+
+    <table>
+        <tr>
+            <th>Nome</th>
+            <th>Telefone</th>
+            <th>Plano</th>
+            <th>Vencimento</th>
+            <th>Status</th>
+            <th>Ações</th>
+        </tr>
+        {% for aluno in alunos %}
+        <tr>
+            <td>{{ aluno.nome }}</td>
+            <td>{{ aluno.telefone }}</td>
+            <td>{{ aluno.plano }}</td>
+            <td>{{ aluno.vencimento }}</td>
+            <td class="{{ aluno.status_pagamento|lower }}">{{ aluno.status_pagamento }}</td>
+            <td>
+                <a class="btn" href="{{ url_for('editar_aluno', id=aluno.id) }}">Editar</a>
+                <a class="btn btn-danger" href="{{ url_for('excluir_aluno', id=aluno.id) }}" onclick="return confirm('Deseja excluir este aluno?')">Excluir</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Agendamento Concluído - DL Fit</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="login-box">
+    <div class="logo-center">
+        <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
+    </div>
+    <h1 class="section-title">Aula agendada com sucesso!</h1>
+    <p class="subtitulo">Seu nome foi registrado no cronograma do dia.</p>
+    <div class="footer-actions">
+        <a href="{{ url_for('cronograma') }}" class="btn-acao">Voltar ao cronograma</a>
+    </div>
+</div>
+</body>
+</html>
