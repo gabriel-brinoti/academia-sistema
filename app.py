@@ -399,6 +399,7 @@ def agendar_aula(aula_id):
     return render_template("agendamento_sucesso.html")
 
 
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
