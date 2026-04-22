@@ -20,11 +20,12 @@
 <div class="form-box">
     <h1 class="section-title">Novo Aluno</h1>
     <p class="subtitulo">Cadastro completo de aluno</p>
-
     <form method="POST">
         <input type="text" name="nome" placeholder="Nome do aluno" required>
         <input type="text" name="telefone" placeholder="Telefone" required>
         <input type="text" name="plano" placeholder="Plano" required>
+        <label>Data de nascimento</label>
+        <input type="date" name="data_nascimento" required>
         <label>Data de vencimento</label>
         <input type="date" name="vencimento" required>
         <label>Status do pagamento</label>
@@ -36,7 +37,6 @@
         <textarea name="observacao" placeholder="Observações"></textarea>
         <button type="submit">Salvar Aluno</button>
     </form>
-
     <div class="footer-actions">
         <a href="{{ url_for('alunos') }}" class="btn-voltar">Voltar</a>
     </div>

@@ -20,11 +20,12 @@
 <div class="form-box">
     <h1 class="section-title">Editar Aluno</h1>
     <p class="subtitulo">Atualize os dados do aluno</p>
-
     <form method="POST">
         <input type="text" name="nome" value="{{ aluno.nome }}" required>
         <input type="text" name="telefone" value="{{ aluno.telefone }}" required>
         <input type="text" name="plano" value="{{ aluno.plano }}" required>
+        <label>Data de nascimento</label>
+        <input type="date" name="data_nascimento" value="{{ aluno.data_nascimento }}" required>
         <input type="date" name="vencimento" value="{{ aluno.vencimento }}" required>
         <label>Status do pagamento</label>
         <select name="status_pagamento" required>
@@ -35,7 +36,6 @@
         <textarea name="observacao" placeholder="Observações">{{ aluno.observacao }}</textarea>
         <button type="submit">Atualizar</button>
     </form>
-
     <div class="footer-actions">
         <a href="{{ url_for('alunos') }}" class="btn-voltar">Voltar</a>
     </div>

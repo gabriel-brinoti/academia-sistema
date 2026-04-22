@@ -22,15 +22,14 @@
 <div class="container">
     <h2 class="section-title">Lista de Alunos</h2>
     <p class="subtitulo">Listagem e busca de alunos</p>
-
     <form method="GET" class="busca-box">
         <input type="text" name="busca" placeholder="Buscar por nome..." value="{{ busca }}">
         <button type="submit">Buscar</button>
     </form>
-
     <table>
         <tr>
             <th>Nome</th>
+            <th>Idade</th>
             <th>Telefone</th>
             <th>Plano</th>
             <th>Vencimento</th>
@@ -40,6 +39,7 @@
         {% for aluno in alunos %}
         <tr>
             <td>{{ aluno.nome }}</td>
+            <td>{{ calcular_idade(aluno.data_nascimento) or '-' }}</td>
             <td>{{ aluno.telefone }}</td>
             <td>{{ aluno.plano }}</td>
             <td>{{ aluno.vencimento }}</td>

@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <title>Cronograma - DL Fit</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .lista-alunos-aula { margin-top: 14px; padding: 12px; background: #f8f8f8; border-radius: 12px; border: 1px solid #ececec; }
+        .lista-alunos-aula h4 { margin-bottom: 8px; }
+        .lista-alunos-aula ul { margin: 0; padding-left: 18px; }
+        .lista-alunos-aula li { margin-bottom: 4px; }
+    </style>
 </head>
 <body>
 <div class="navbar">
@@ -22,17 +28,9 @@
     {% if aulas_hoje %}
         {% for aula in aulas_hoje %}
         <div class="aula-card">
-            <div class="aula-linha">
-                {{ aula.horario }} - {{ aula.modalidade }}
-            </div>
-
-            <div class="progress">
-                <div class="progress-bar" style="width: {{ aula.percentual }}%;"></div>
-            </div>
-
-            <div class="aula-info">
-                {{ aula.ocupadas }} / {{ aula.capacidade }} vagas ocupadas — Restam {{ aula.restantes }}
-            </div>
+            <div class="aula-linha">{{ aula.horario }} - {{ aula.modalidade }}</div>
+            <div class="progress"><div class="progress-bar" style="width: {{ aula.percentual }}%;"></div></div>
+            <div class="aula-info">{{ aula.ocupadas }} / {{ aula.capacidade }} vagas ocupadas — Restam {{ aula.restantes }}</div>
 
             {% if aula.lotada %}
                 <button class="btn-danger" disabled>Lotado</button>
@@ -47,12 +45,23 @@
                     <button type="submit">Entrar na aula</button>
                 </form>
             {% endif %}
+
+            <div class="lista-alunos-aula">
+                <h4>Alunos inscritos nesta aula</h4>
+                {% if aula.inscritos %}
+                    <ul>
+                        {% for inscrito in aula.inscritos %}
+                            <li>{{ inscrito.nome }}{% if inscrito.idade is not none %} — {{ inscrito.idade }} anos{% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>Nenhum aluno inscrito até o momento.</p>
+                {% endif %}
+            </div>
         </div>
         {% endfor %}
     {% else %}
-        <div class="aula-card">
-            <div class="aula-info">Não há aulas cadastradas para hoje.</div>
-        </div>
+        <div class="aula-card"><div class="aula-info">Não há aulas cadastradas para hoje.</div></div>
     {% endif %}
 </div>
 </body>

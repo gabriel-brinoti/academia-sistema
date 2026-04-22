@@ -1,9 +1,13 @@
-SUBSTITUA ESTES ARQUIVOS NO PROJETO:
+SUBSTITUA ESTES ARQUIVOS:
+- app.py
+- templates/novo_aluno.html
+- templates/editar_aluno.html
+- templates/alunos.html
+- templates/cronograma.html
 
-1) app.py  -> na raiz do projeto
-2) login.html -> dentro da pasta templates
-3) cronograma.html -> dentro da pasta templates
-4) agendamento_sucesso.html -> dentro da pasta templates
+DEPOIS:
+git add .
+git commit -m "Adicionando idade e lista por aula"
+git push
 
-IMPORTANTE:
-Se o cronograma não aparecer, apague o arquivo academia.db e rode o sistema de novo.
+Se der problema com banco local antigo, apague academia.db e rode de novo.
