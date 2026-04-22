@@ -123,21 +123,30 @@ def listar_aulas_do_dia(dia_semana=None):
         dia_semana = obter_dia_semana()
 
     conn = conectar()
-    aulas = conn.execute("""
-        SELECT a.id, a.dia_semana, a.horario, a.modalidade, a.capacidade,
-               COUNT(ag.id) AS ocupadas
-        FROM aulas a
-        LEFT JOIN agendamentos ag ON ag.aula_id = a.id
-        GROUP BY a.id
-        HAVING a.dia_semana = ?
-        ORDER BY a.horario
-    """, (dia_semana,)).fetchall()
-
     hoje = datetime.now().strftime("%Y-%m-%d")
+
+    aulas = conn.execute("""
+        SELECT 
+            a.id, 
+            a.dia_semana, 
+            a.horario, 
+            a.modalidade, 
+            a.capacidade,
+            COUNT(ag.id) AS ocupadas
+        FROM aulas a
+        LEFT JOIN agendamentos ag 
+            ON ag.aula_id = a.id 
+            AND ag.data_agendamento = ?
+        WHERE a.dia_semana = ?
+        GROUP BY a.id, a.dia_semana, a.horario, a.modalidade, a.capacidade
+        ORDER BY a.horario
+    """, (hoje, dia_semana)).fetchall()
+
     dados = []
     for aula in aulas:
         ocupadas = aula["ocupadas"] or 0
         capacidade = aula["capacidade"] or 10
+
         inscritos_db = conn.execute("""
             SELECT al.nome, al.data_nascimento
             FROM agendamentos ag
@@ -146,7 +155,13 @@ def listar_aulas_do_dia(dia_semana=None):
             ORDER BY al.nome ASC
         """, (aula["id"], hoje)).fetchall()
 
-        inscritos = [{"nome": i["nome"], "idade": calcular_idade(i["data_nascimento"])} for i in inscritos_db]
+        inscritos = [
+            {
+                "nome": i["nome"],
+                "idade": calcular_idade(i["data_nascimento"])
+            }
+            for i in inscritos_db
+        ]
 
         item = dict(aula)
         item["restantes"] = max(capacidade - ocupadas, 0)
