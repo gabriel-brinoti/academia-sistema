@@ -327,6 +327,21 @@ def agendar_aula(aula_id):
     conn.close()
     return render_template("agendamento_sucesso.html")
 
+@app.route("/acesso_professor", methods=["POST"])
+def acesso_professor():
+    senha = request.form.get("senha_professor", "")
+
+    if senha == "prof123":
+        session["professor_liberado"] = True
+
+    return redirect(url_for("cronograma"))
+
+
+@app.route("/sair_professor")
+def sair_professor():
+    session.pop("professor_liberado", None)
+    return redirect(url_for("cronograma"))
+
 init_db()
 
 if __name__ == "__main__":

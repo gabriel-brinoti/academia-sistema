@@ -25,6 +25,17 @@
 <div class="container">
     <h2 class="schedule-title">Cronograma do Dia</h2>
 
+    <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+    {% if session.get("admin_logado") or session.get("professor_liberado") %}
+        <a href="{{ url_for('sair_professor') }}" class="btn">Sair do modo professor</a>
+    {% else %}
+        <form method="POST" action="{{ url_for('acesso_professor') }}" style="display:flex; gap:10px; flex-wrap:wrap; background:none; padding:0; margin:0; max-width:none;">
+            <input type="password" name="senha_professor" placeholder="Senha do professor" required style="max-width: 220px;">
+            <button type="submit">Acesso do Professor</button>
+        </form>
+    {% endif %}
+</div>
+
     {% if aulas_hoje %}
         {% for aula in aulas_hoje %}
         <div class="aula-card">
@@ -46,18 +57,25 @@
                 </form>
             {% endif %}
 
-            <div class="lista-alunos-aula">
-                <h4>Alunos inscritos nesta aula</h4>
-                {% if aula.inscritos %}
-                    <ul>
-                        {% for inscrito in aula.inscritos %}
-                            <li>{{ inscrito.nome }}{% if inscrito.idade is not none %} — {{ inscrito.idade }} anos{% endif %}</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p>Nenhum aluno inscrito até o momento.</p>
-                {% endif %}
-            </div>
+            {% if session.get("admin_logado") or session.get("professor_liberado") %}
+<div class="lista-alunos-aula">
+    <h4>Alunos inscritos nesta aula</h4>
+    {% if aula.inscritos %}
+        <ul>
+            {% for inscrito in aula.inscritos %}
+                <li>
+                    {{ inscrito.nome }}
+                    {% if inscrito.idade is not none %}
+                        — {{ inscrito.idade }} anos
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>Nenhum aluno inscrito até o momento.</p>
+    {% endif %}
+</div>
+{% endif %}
         </div>
         {% endfor %}
     {% else %}
