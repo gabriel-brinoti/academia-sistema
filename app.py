@@ -322,7 +322,11 @@ def agendar_aula(aula_id):
     cursor = conn.cursor()
     aluno = cursor.execute("SELECT * FROM alunos WHERE id = ?", (aluno_id,)).fetchone()
     aula = cursor.execute("SELECT * FROM aulas WHERE id = ?", (aula_id,)).fetchone()
-    ocupadas = cursor.execute("SELECT COUNT(*) FROM agendamentos WHERE aula_id = ?", (aula_id,)).fetchone()[0]
+    data_agendamento = datetime.now().strftime("%Y-%m-%d")
+    ocupadas = cursor.execute(
+    "SELECT COUNT(*) FROM agendamentos WHERE aula_id = ? AND data_agendamento = ?",
+    (aula_id, data_agendamento)
+    ).fetchone()[0]
 
     if not aluno or not aula or aluno["aulas_restantes"] <= 0 or ocupadas >= aula["capacidade"]:
         conn.close()
