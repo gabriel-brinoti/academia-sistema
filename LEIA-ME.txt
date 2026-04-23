@@ -1,13 +1,12 @@
-SUBSTITUA ESTES ARQUIVOS:
+SUBSTITUA:
 - app.py
-- templates/novo_aluno.html
-- templates/editar_aluno.html
-- templates/alunos.html
-- templates/cronograma.html
+- requirements.txt
 
 DEPOIS:
 git add .
-git commit -m "Adicionando idade e lista por aula"
+git commit -m "Migrando para PostgreSQL"
 git push
 
-Se der problema com banco local antigo, apague academia.db e rode de novo.
+NO RENDER:
+- confirme que a variável DATABASE_URL está configurada no Web Service
+- espere o redeploy automático
