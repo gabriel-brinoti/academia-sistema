@@ -372,6 +372,7 @@ def excluir_aluno(id):
 
     conn = conectar()
     cursor = conn.cursor()
+    cursor.execute("DELETE FROM agendamentos WHERE aluno_id = %s", (id,))
     cursor.execute("DELETE FROM alunos WHERE id = %s", (id,))
     conn.commit()
     conn.close()
