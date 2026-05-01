@@ -26,6 +26,17 @@ def conectar():
 def remover_acentos(texto):
     return unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('ASCII')
 
+def limite_plano(plano):
+    plano = remover_acentos(str(plano).upper().strip())
+
+    if plano == "LIGHT":
+        return 4
+    elif plano == "BASICO":
+        return 12
+    elif plano in ["CLUBE", "CLUBE+"]:
+        return 9999
+
+    return 0
 
 def calcular_idade(data_nascimento):
     if not data_nascimento:
@@ -456,6 +467,14 @@ def agendar_aula(aula_id):
     cursor.execute("SELECT * FROM aulas WHERE id = %s", (aula_id,))
     aula = cursor.fetchone()
 
+    if not aluno or not aula:
+        conn.close()
+        return redirect(url_for("cronograma"))
+    
+    if aluno["status_pagamento"] != "Pago":
+        conn.close()
+        return redirect(url_for("cronograma"))
+
     data_agendamento = datetime.now().strftime("%Y-%m-%d")
 
     cursor.execute(
@@ -464,7 +483,20 @@ def agendar_aula(aula_id):
     )
     ocupadas = cursor.fetchone()["total"]
 
-    if not aluno or not aula or aluno["aulas_restantes"] <= 0 or ocupadas >= aula["capacidade"]:
+    inicio_mes = date.today().replace(day=1).strftime("%Y-%m-%d")
+    hoje = date.today().strftime("%Y-%m-%d")
+
+    cursor.execute("""
+        SELECT COUNT(*) AS total
+        FROM agendamentos
+        WHERE aluno_id = %s
+        AND data_agendamento BETWEEN %s AND %s
+    """, (aluno_id, inicio_mes, hoje))
+
+    aulas_usadas_mes = cursor.fetchone()["total"]
+    limite = limite_plano(aluno["plano"])
+
+    if aulas_usadas_mes >= limite or ocupadas >= aula["capacidade"]:
         conn.close()
         return redirect(url_for("cronograma"))
 
@@ -482,11 +514,6 @@ def agendar_aula(aula_id):
     cursor.execute(
         "INSERT INTO agendamentos (aluno_id, aula_id, data_agendamento) VALUES (%s, %s, %s)",
         (aluno_id, aula_id, data_agendamento)
-    )
-
-    cursor.execute(
-        "UPDATE alunos SET aulas_restantes = aulas_restantes - 1 WHERE id = %s",
-        (aluno_id,)
     )
 
     conn.commit()
