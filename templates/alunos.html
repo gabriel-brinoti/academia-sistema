@@ -32,6 +32,7 @@
             <th>Idade</th>
             <th>Telefone</th>
             <th>Plano</th>
+            <th>Aulas no mês</th>
             <th>Vencimento</th>
             <th>Status</th>
             <th>Ações</th>
@@ -42,6 +43,7 @@
             <td>{{ calcular_idade(aluno.data_nascimento) or '-' }}</td>
             <td>{{ aluno.telefone }}</td>
             <td>{{ aluno.plano }}</td>
+            <td>{{ aluno.resumo_aulas }}</td>
             <td>{{ aluno.vencimento }}</td>
             <td class="{{ aluno.status_pagamento|lower }}">{{ aluno.status_pagamento }}</td>
             <td>

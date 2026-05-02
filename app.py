@@ -4,7 +4,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import pandas as pd
 import unicodedata
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 app = Flask(__name__)
 app.secret_key = "academia_secret"
@@ -37,6 +37,27 @@ def limite_plano(plano):
         return 9999
 
     return 0
+
+def resumo_aulas_mes(cursor, aluno_id, plano):
+    inicio_mes = date.today().replace(day=1).strftime("%Y-%m-%d")
+    hoje = date.today().striftime("%Y-%m-%d")
+
+    cursor.execute("""
+        SELECT COUNT(*) AS total
+        FROM agendamentos
+        WHERE aluno_id = %s
+        AND data_agendamento BETWEEN %s AND %s
+    """, (aluno_id, inicio_mes, hoje))
+
+    usadas = cursor.fetchone()["total"]
+    limite = limite_plano(plano)
+
+    if limite >= 9999:
+        return f"{usadas} / ilimitado"
+    
+    restantes = max(limite - usadas, 0)
+    return f"{usadas} / {limite} usadas - restam {restantes}"
+
 
 def calcular_idade(data_nascimento):
     if not data_nascimento:
@@ -149,8 +170,16 @@ def init_db():
 
     conn.close()
 
+def obter_data_base():
+    agora = datetime.now()
+
+    if agora >= 20:
+        return date.today() + timedelta(days=1)
+    return date.today()
 
 def obter_dia_semana():
+    data_base = obter_data_base()
+
     mapa = {
         0: "Segunda-feira",
         1: "Terca-feira",
@@ -160,7 +189,8 @@ def obter_dia_semana():
         5: "Sabado",
         6: "Domingo",
     }
-    return mapa[datetime.now().weekday()]
+
+    return mapa[data_base.weekday()]
 
 
 def listar_aulas_do_dia(dia_semana=None):
@@ -169,7 +199,8 @@ def listar_aulas_do_dia(dia_semana=None):
 
     conn = conectar()
     cursor = conn.cursor()
-    hoje = datetime.now().strftime("%Y-%m-%d")
+    data_base = obter_data_base()
+    hoje = data_base.strftime("%Y-%m-%d")
 
     cursor.execute("""
         SELECT 
@@ -299,6 +330,9 @@ def alunos():
     else:
         cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
         alunos = cursor.fetchall()
+
+    for aluno in alunos:
+        aluno["resumo_aulas"] = resumo_aulas_mes(cursor, aluno["id"], aluno["plano"])
 
     conn.close()
     return render_template("alunos.html", alunos=alunos, busca=busca, calcular_idade=calcular_idade)
@@ -475,7 +509,7 @@ def agendar_aula(aula_id):
         conn.close()
         return redirect(url_for("cronograma"))
 
-    data_agendamento = datetime.now().strftime("%Y-%m-%d")
+    data_agendamento = obter_data_base().strftime("%Y-%m-%d")
 
     cursor.execute(
         "SELECT COUNT(*) AS total FROM agendamentos WHERE aula_id = %s AND data_agendamento = %s",
