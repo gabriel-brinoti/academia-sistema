@@ -491,32 +491,49 @@ def cronograma():
 
 @app.route("/agendar_aula/<int:aula_id>", methods=["POST"])
 def agendar_aula(aula_id):
-    aluno_id = request.form["aluno_id"]
+    nome_digitado = request.form["nome_aluno"]
+
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM alunos WHERE id = %s", (aluno_id,))
+    # 🔍 buscar aluno pelo nome
+    cursor.execute("""
+        SELECT * FROM alunos
+        WHERE LOWER(nome) = LOWER(%s)
+    """, (nome_digitado.strip(),))
+
     aluno = cursor.fetchone()
 
+    if not aluno:
+        conn.close()
+        return redirect(url_for("cronograma"))
+
+    aluno_id = aluno["id"]
+
+    # buscar aula
     cursor.execute("SELECT * FROM aulas WHERE id = %s", (aula_id,))
     aula = cursor.fetchone()
 
-    if not aluno or not aula:
+    if not aula:
         conn.close()
         return redirect(url_for("cronograma"))
-    
+
+    # 🚫 bloqueio por pagamento
     if aluno["status_pagamento"] != "Pago":
         conn.close()
         return redirect(url_for("cronograma"))
 
     data_agendamento = obter_data_base().strftime("%Y-%m-%d")
 
-    cursor.execute(
-        "SELECT COUNT(*) AS total FROM agendamentos WHERE aula_id = %s AND data_agendamento = %s",
-        (aula_id, data_agendamento)
-    )
+    # vagas ocupadas
+    cursor.execute("""
+        SELECT COUNT(*) AS total
+        FROM agendamentos
+        WHERE aula_id = %s AND data_agendamento = %s
+    """, (aula_id, data_agendamento))
     ocupadas = cursor.fetchone()["total"]
 
+    # limite mensal
     inicio_mes = date.today().replace(day=1).strftime("%Y-%m-%d")
     hoje = date.today().strftime("%Y-%m-%d")
 
@@ -534,24 +551,26 @@ def agendar_aula(aula_id):
         conn.close()
         return redirect(url_for("cronograma"))
 
+    # evitar duplicado
     cursor.execute("""
-        SELECT 1 AS existe
+        SELECT 1
         FROM agendamentos
         WHERE aluno_id = %s AND aula_id = %s AND data_agendamento = %s
     """, (aluno_id, aula_id, data_agendamento))
-    ja_agendado = cursor.fetchone()
 
-    if ja_agendado:
+    if cursor.fetchone():
         conn.close()
         return redirect(url_for("cronograma"))
 
-    cursor.execute(
-        "INSERT INTO agendamentos (aluno_id, aula_id, data_agendamento) VALUES (%s, %s, %s)",
-        (aluno_id, aula_id, data_agendamento)
-    )
+    # salvar
+    cursor.execute("""
+        INSERT INTO agendamentos (aluno_id, aula_id, data_agendamento)
+        VALUES (%s, %s, %s)
+    """, (aluno_id, aula_id, data_agendamento))
 
     conn.commit()
     conn.close()
+
     return render_template("agendamento_sucesso.html")
 
 
