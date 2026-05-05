@@ -176,7 +176,7 @@ def obter_data_base():
     agora = datetime.now()
 
     if agora.hour >= 20:
-        return agora.date() + timedelta(day=1)
+        return agora.date() + timedelta(days=1)
     
     return agora.date()
 
