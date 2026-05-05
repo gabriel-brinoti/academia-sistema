@@ -184,6 +184,10 @@ def obter_data_base():
     
     return agora.date()
 
+def obter_data_cronograma_formatada():
+    data_base = obter_data_base()
+    return data_base.strftime("%d/%m/%Y")
+
 def obter_dia_semana():
     data_base = obter_data_base()
 
@@ -487,6 +491,7 @@ def importar_excel():
 @app.route("/cronograma")
 def cronograma():
     dia_atual, aulas_hoje = listar_aulas_do_dia()
+    data_cronograma = obter_data_cronograma_formatada()
 
     conn = conectar()
     cursor = conn.cursor()
@@ -494,7 +499,13 @@ def cronograma():
     alunos = cursor.fetchall()
     conn.close()
 
-    return render_template("cronograma.html", dia_atual=dia_atual, aulas_hoje=aulas_hoje, alunos=alunos)
+    return render_template(
+        "cronograma.html",
+        dia_atual=dia_atual,
+        data_cronograma=data_cronograma,
+        aulas_hoje=aulas_hoje,
+        alunos=alunos
+    )
 
 
 @app.route("/agendar_aula/<int:aula_id>", methods=["POST"])
