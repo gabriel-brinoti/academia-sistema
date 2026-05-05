@@ -271,7 +271,7 @@ def home():
 def login():
     erro = None
     if request.method == "POST":
-        if request.form["usuario"] == "admin" and request.form["senha"] == "1234":
+        if request.form["usuario"] == "dlfit" and request.form["senha"] == "academia@2026":
             session["admin_logado"] = True
             return redirect(url_for("dashboard"))
         erro = "Usuario ou senha invalidos"
@@ -585,7 +585,7 @@ def agendar_aula(aula_id):
 @app.route("/acesso_professor", methods=["POST"])
 def acesso_professor():
     senha = request.form.get("senha_professor", "")
-    if senha == "prof123":
+    if senha == "dlfit":
         session["professor_liberado"] = True
     return redirect(url_for("cronograma"))
 
