@@ -40,7 +40,7 @@ def limite_plano(plano):
 
 def resumo_aulas_mes(cursor, aluno_id, plano):
     inicio_mes = date.today().replace(day=1).strftime("%Y-%m-%d")
-    hoje = date.today().striftime("%Y-%m-%d")
+    hoje = date.today().strftime("%Y-%m-%d")
 
     cursor.execute("""
         SELECT COUNT(*) AS total
@@ -173,8 +173,9 @@ def init_db():
 from datetime import datetime, timedelta
 
 def obter_data_base():
-    agora = datetime.now()
-    if agora.hour >= 20:
+    agora = datetime.now().hour
+
+    if agora >= 20:
         return agora.date() + timedelta(day=1)
     
     return agora.date()
