@@ -359,11 +359,11 @@ def novo_aluno():
 
         cursor.execute("""
             INSERT INTO alunos (
-                nome, telefone, plano, vencimento, status_pagamento,
-                observacao, aulas_restantes, usuario, senha, data_nascimento
+            nome, telefone, plano, vencimento, status_pagamento,
+            observacao, aulas_restantes, usuario, senha, data_nascimento, data_inicio
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
+            """, (
             nome,
             request.form["telefone"],
             request.form["plano"],
