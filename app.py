@@ -170,12 +170,14 @@ def init_db():
 
     conn.close()
 
+from datetime import datetime, timedelta
+
 def obter_data_base():
     agora = datetime.now()
-
-    if agora >= 20:
-        return date.today() + timedelta(days=1)
-    return date.today()
+    if agora.hour >= 20:
+        return agora.date() + timedelta(day=1)
+    
+    return agora.date()
 
 def obter_dia_semana():
     data_base = obter_data_base()
