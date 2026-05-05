@@ -177,7 +177,7 @@ def init_db():
 from datetime import datetime, timedelta
 
 def obter_data_base():
-    agora = datetime.now()
+    agora = datetime.utcnow() - timedelta(hours=3)
 
     if agora.hour >= 20:
         return agora.date() + timedelta(days=1)
