@@ -506,9 +506,9 @@ def agendar_aula(aula_id):
 
     # 🔍 buscar aluno pelo nome
     cursor.execute("""
-        SELECT * FROM alunos
-        WHERE LOWER(nome) LIKE LOWER(%s)
-    """, (f"%{nome_digitado.strip()}%",))
+    SELECT * FROM alunos
+    WHERE LOWER(nome) = LOWER(%s)
+""", (nome_digitado.strip(),))
 
     aluno = cursor.fetchone()
 
