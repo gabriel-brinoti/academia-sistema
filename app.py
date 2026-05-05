@@ -124,6 +124,10 @@ def init_db():
         )
     """)
 
+    cursor.execute("""
+        ALTER TABLE alunos ADD COLUMN IF NOT EXISTS data_nicio TEXT
+    """)
+
     conn.commit()
 
     cursor.execute("SELECT COUNT(*) AS total FROM aulas")
@@ -369,7 +373,8 @@ def novo_aluno():
             12,
             usuario,
             "1234",
-            request.form.get("data_nascimento", "")
+            request.form.get("data_nascimento", ""),
+            request.form.get("data_nicio", "")
         ))
 
         conn.commit()
@@ -502,8 +507,8 @@ def agendar_aula(aula_id):
     # 🔍 buscar aluno pelo nome
     cursor.execute("""
         SELECT * FROM alunos
-        WHERE LOWER(nome) = LOWER(%s)
-    """, (nome_digitado.strip(),))
+        WHERE LOWER(nome) LIKE LOWER(%s)
+    """, (f"%{nome_digitado.strip()}%",))
 
     aluno = cursor.fetchone()
 
