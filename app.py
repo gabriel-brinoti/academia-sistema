@@ -175,7 +175,7 @@ from datetime import datetime, timedelta
 def obter_data_base():
     agora = datetime.now().hour
 
-    if agora >= 20:
+    if agora.hour >= 20:
         return agora.date() + timedelta(day=1)
     
     return agora.date()
