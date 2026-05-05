@@ -125,7 +125,7 @@ def init_db():
     """)
 
     cursor.execute("""
-        ALTER TABLE alunos ADD COLUMN IF NOT EXISTS data_nicio TEXT
+        ALTER TABLE alunos ADD COLUMN IF NOT EXISTS data_inicio TEXT
     """)
 
     conn.commit()
@@ -362,7 +362,7 @@ def novo_aluno():
                 nome, telefone, plano, vencimento, status_pagamento,
                 observacao, aulas_restantes, usuario, senha, data_nascimento
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             nome,
             request.form["telefone"],
@@ -374,7 +374,7 @@ def novo_aluno():
             usuario,
             "1234",
             request.form.get("data_nascimento", ""),
-            request.form.get("data_nicio", "")
+            request.form.get("data_inicio", "")
         ))
 
         conn.commit()
