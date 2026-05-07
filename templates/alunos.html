@@ -26,6 +26,10 @@
         <input type="text" name="busca" placeholder="Buscar por nome..." value="{{ busca }}">
         <button type="submit">Buscar</button>
     </form>
+    <a class="btn btn-danger" href="{{ url_for('excluir_todos_alunos') }}"
+   onclick="return confirm('Tem certeza que deseja excluir TODOS os alunos e agendamentos? Essa ação não pode ser desfeita.')">
+   Excluir todos os alunos
+</a>
     <table>
         <tr>
             <th>Nome</th>

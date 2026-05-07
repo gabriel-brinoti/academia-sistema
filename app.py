@@ -412,6 +412,22 @@ def alunos():
     return render_template("alunos.html", alunos=alunos, busca=busca, calcular_idade=calcular_idade)
 
 
+@app.route("/excluir_todos_alunos")
+def excluir_todos_alunos():
+    if "admin_logado" not in session:
+        return redirect(url_for("login"))
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM agendamentos")
+    cursor.execute("DELETE FROM alunos")
+
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for("alunos"))
+
 @app.route("/novo_aluno", methods=["GET", "POST"])
 def novo_aluno():
     if "admin_logado" not in session:
@@ -537,7 +553,7 @@ def importar_excel():
                         str(row.get("Plano", "")),
                         str(row.get("Vencimento", "")),
                         str(row.get("Status", "Pendente")),
-                        "",
+                        str(row.get("Observacao")),
                         12,
                         usuario,
                         "1234",
@@ -604,7 +620,7 @@ def agendar_aula(aula_id):
         return redirect(url_for("cronograma"))
 
     # 🚫 bloqueio por pagamento
-    if aluno["status_pagamento"] != "Pago":
+    if aluno["status_pagamento"] == "Atrasado":
         conn.close()
         return redirect(url_for("cronograma"))
 
