@@ -45,7 +45,13 @@
                 <button class="btn-danger" disabled>Lotado</button>
             {% else %}
                 <form method="POST" action="{{ url_for('agendar_aula', aula_id=aula.id) }}">
-                    <input type="text" name="nome_aluno" placeholder="Digite seu nome" required>
+                    <input type="text" name="nome_aluno" list="lista_alunos" required>
+
+<datalist id="lista_alunos">
+    {% for aluno in alunos %}
+        <option value="{{ aluno.nome }}">
+    {% endfor %}
+</datalist>
                     <button type="submit">Entrar na aula</button>
                 </form>
             {% endif %}
