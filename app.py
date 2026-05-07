@@ -155,7 +155,6 @@ def init_db():
             ("Segunda-feira", "19:00", "Circo / Step Dance", 7),
             ("Segunda-feira", "20:00", "Musculação", 7),
             ("Segunda-feira", "20:00", "Acroyoga", 7),
-            ("Terca-feira", "05:00", "Musculação", 7),
             ("Terca-feira", "05:00", "Neopilates", 10),
             ("Terca-feira", "06:00", "Musculação", 7),
             ("Terca-feira", "07:00", "Musculação", 7),
@@ -194,7 +193,6 @@ def init_db():
             ("Quarta-feira", "19:00", "Stepdance / Circo", 7),
             ("Quarta-feira", "20:00", "Musculação", 7),
             ("Quarta-feira", "20:00", "Acroyoga", 7),
-            ("Quinta-feira", "05:00", "Musculação", 7),
             ("Quinta-feira", "05:00", "Neopilates", 10),
             ("Quinta-feira", "06:00", "Musculação", 7),
             ("Quinta-feira", "07:00", "Circo / Spin Fit", 10),
@@ -244,7 +242,7 @@ from datetime import datetime, timedelta
 def obter_data_base():
     agora = datetime.utcnow() - timedelta(hours=3)
 
-    if agora.hour >= 20:
+    if agora.hour >= 21:
         return agora.date() + timedelta(days=1)
     
     return agora.date()
@@ -465,7 +463,7 @@ def editar_aluno(id):
         cursor.execute("""
             UPDATE alunos
             SET nome=%s, telefone=%s, plano=%s, vencimento=%s,
-                status_pagamento=%s, observacao=%s, data_nascimento=%s
+                status_pagamento=%s, observacao=%s, data_nascimento=%s , data_inicio=%s
             WHERE id=%s
         """, (
             request.form["nome"],
@@ -475,6 +473,7 @@ def editar_aluno(id):
             request.form["status_pagamento"],
             request.form.get("observacao", ""),
             request.form.get("data_nascimento", ""),
+            request.form.get("data_inicio", ""),
             id
         ))
         conn.commit()
@@ -527,11 +526,12 @@ def importar_excel():
 
                     cursor.execute("""
                         INSERT INTO alunos (
-                            nome, telefone, plano, vencimento, status_pagamento,
-                            observacao, aulas_restantes, usuario, senha, data_nascimento
+                        nome, telefone, plano, vencimento, status_pagamento,
+                        observacao, aulas_restantes, usuario, senha,
+                        data_nascimento, data_inicio
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
                         nome,
                         str(row.get("Telefone", "")),
                         str(row.get("Plano", "")),
@@ -541,7 +541,8 @@ def importar_excel():
                         12,
                         usuario,
                         "1234",
-                        str(row.get("DataNascimento", ""))
+                        str(row.get("DataNascimento", "")),
+                        str(row.get("DataInicio", ""))
                     ))
 
                 conn.commit()
