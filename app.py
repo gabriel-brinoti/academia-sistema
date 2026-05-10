@@ -654,7 +654,8 @@ def agendar_aula(aula_id):
         conn.close()
         return redirect(url_for("cronograma"))
 
-    data_agendamento = obter_data_base().strftime("%Y-%m-%d")
+    data_base = obter_data_base()
+    data_agendamento = data_base.strftime("%Y-%m-%d")
 
     # vagas ocupadas
     cursor.execute("""
@@ -665,8 +666,8 @@ def agendar_aula(aula_id):
     ocupadas = cursor.fetchone()["total"]
 
     # limite mensal
-    inicio_mes = date.today().replace(day=1).strftime("%Y-%m-%d")
-    hoje = date.today().strftime("%Y-%m-%d")
+    inicio_mes = data_base.replace(day=1).strftime("%Y-%m-%d")
+    hoje = data_base.strftime("%Y-%m-%d")
 
     cursor.execute("""
         SELECT COUNT(*) AS total
