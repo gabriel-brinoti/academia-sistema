@@ -26,7 +26,10 @@ def conectar():
 def remover_acentos(texto):
     return unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('ASCII')
 
-def limite_plano(plano):
+def limite_plano(plano, aulas_contratadas=None):
+    if aulas_contratadas:
+        return int(aulas_contratadas)
+
     plano = remover_acentos(str(plano).upper().strip())
 
     if plano == "LIGHT":
@@ -50,7 +53,9 @@ def resumo_aulas_mes(cursor, aluno_id, plano):
     """, (aluno_id, inicio_mes, hoje))
 
     usadas = cursor.fetchone()["total"]
-    limite = limite_plano(plano)
+    cursor.execute("SELECT aulas_contratadas FROM alunos WHERE id = %s", (aluno_id,))
+    aluno = cursor.fetchone()
+    limite = limite_plano(plano, aluno["aulas_contratadas"])
 
     if limite >= 9999:
         return f"{usadas} / ilimitado"
@@ -91,18 +96,19 @@ def init_db():
             aulas_restantes INTEGER DEFAULT 12,
             usuario TEXT,
             senha TEXT,
-            data_nascimento TEXT
+            data_nascimento TEXT,
+            aulas_contratadas INTEGER
         )
     """)
 
     cursor.execute("""
         SELECT column_name
         FROM information_schema.columns
-        WHERE table_name = 'alunos' AND column_name = 'data_nascimento'
+        WHERE table_name = 'alunos' AND column_name = 'aulas_contratadas'
     """)
     coluna = cursor.fetchone()
     if not coluna:
-        cursor.execute("ALTER TABLE alunos ADD COLUMN data_nascimento TEXT")
+        cursor.execute("ALTER TABLE alunos ADD COLUMN aulas_contratadas INTEGER")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS aulas (
@@ -127,6 +133,10 @@ def init_db():
     cursor.execute("""
         ALTER TABLE alunos ADD COLUMN IF NOT EXISTS data_inicio TEXT
     """)
+
+    cursor.execute("""
+    ALTER TABLE alunos ADD COLUMN IF NOT EXISTS aulas_contratadas INTEGER
+""")
 
     conn.commit()
 
@@ -443,9 +453,9 @@ def novo_aluno():
         cursor.execute("""
             INSERT INTO alunos (
             nome, telefone, plano, vencimento, status_pagamento,
-            observacao, aulas_restantes, usuario, senha, data_nascimento, data_inicio
+            observacao, aulas_restantes, usuario, senha, data_nascimento, data_inicio, aulas_contratadas
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
             nome,
             request.form["telefone"],
@@ -457,7 +467,8 @@ def novo_aluno():
             usuario,
             "1234",
             request.form.get("data_nascimento", ""),
-            request.form.get("data_inicio", "")
+            request.form.get("data_inicio", ""),
+            request.form.get("aulas_contratadas") or None
         ))
 
         conn.commit()
@@ -479,7 +490,7 @@ def editar_aluno(id):
         cursor.execute("""
             UPDATE alunos
             SET nome=%s, telefone=%s, plano=%s, vencimento=%s,
-                status_pagamento=%s, observacao=%s, data_nascimento=%s , data_inicio=%s
+                status_pagamento=%s, observacao=%s, data_nascimento=%s , data_inicio=%s, aulas_contratadas=%s
             WHERE id=%s
         """, (
             request.form["nome"],
@@ -490,6 +501,7 @@ def editar_aluno(id):
             request.form.get("observacao", ""),
             request.form.get("data_nascimento", ""),
             request.form.get("data_inicio", ""),
+            request.form.get("aulas_contratadas") or None,
             id
         ))
         conn.commit()
@@ -540,26 +552,36 @@ def importar_excel():
 
                     usuario = remover_acentos(nome.split()[0].lower())
 
+                    telefone = "" if pd.isna(row.get("Telefone")) else str(row.get("Telefone"))
+                    plano = "" if pd.isna(row.get("Plano")) else str(row.get("Plano"))
+                    vencimento = "" if pd.isna(row.get("Vencimento")) else str(row.get("Vencimento"))
+                    status = "Pendente" if pd.isna(row.get("Status")) else str(row.get("Status"))
+                    observacao = "" if pd.isna(row.get("Observacao")) else str(row.get("Observacao"))
+                    data_nascimento = "" if pd.isna(row.get("DataNascimento")) else str(row.get("DataNascimento"))
+                    data_inicio = "" if pd.isna(row.get("DataInicio")) else str(row.get("DataInicio"))
+                    aulas_contratadas = None if pd.isna(row.get("AulasContratadas")) else int(row.get("AulasContratadas"))
+
                     cursor.execute("""
                         INSERT INTO alunos (
                         nome, telefone, plano, vencimento, status_pagamento,
                         observacao, aulas_restantes, usuario, senha,
-                        data_nascimento, data_inicio
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        """, (
-                        nome,
-                        str(row.get("Telefone", "")),
-                        str(row.get("Plano", "")),
-                        str(row.get("Vencimento", "")),
-                        str(row.get("Status", "Pendente")),
-                        str(row.get("Observacao")),
-                        12,
-                        usuario,
-                        "1234",
-                        str(row.get("DataNascimento", "")),
-                        str(row.get("DataInicio", ""))
-                    ))
+                        data_nascimento, data_inicio, aulas_contratadas
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    nome,
+                    telefone,
+                    plano,
+                    vencimento,
+                    status,
+                    observacao,
+                    12,
+                    usuario,
+                    "1234",
+                    data_nascimento,
+                    data_inicio,
+                    aulas_contratadas
+                ))
 
                 conn.commit()
                 conn.close()
@@ -646,7 +668,8 @@ def agendar_aula(aula_id):
     """, (aluno_id, inicio_mes, hoje))
 
     aulas_usadas_mes = cursor.fetchone()["total"]
-    limite = limite_plano(aluno["plano"])
+    
+    limite = limite_plano(aluno["plano"], aluno["aulas_contratadas"])
 
     if aulas_usadas_mes >= limite or ocupadas >= aula["capacidade"]:
         conn.close()

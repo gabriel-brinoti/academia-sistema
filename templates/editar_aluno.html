@@ -24,6 +24,8 @@
         <input type="text" name="nome" value="{{ aluno.nome }}" required>
         <input type="text" name="telefone" value="{{ aluno.telefone }}" required>
         <input type="text" name="plano" value="{{ aluno.plano }}" required>
+        <label>Aulas contratadas no mês:</label>
+<input type="number" name="aulas_contratadas" value="{{ aluno.aulas_contratadas or '' }}" placeholder="Ex: 4, 12 ou deixe vazio para padrão">
         <label>Data de nascimento</label>
         <input type="date" name="data_nascimento" value="{{ aluno.data_nascimento }}" required>
         <input type="date" name="vencimento" value="{{ aluno.vencimento }}" required>
