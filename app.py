@@ -249,12 +249,20 @@ def init_db():
 
 from datetime import datetime, timedelta
 
+from datetime import datetime, timedelta
+
 def obter_data_base():
     agora = datetime.utcnow() - timedelta(hours=3)
 
-    if agora.hour >= 21:
-        return agora.date() + timedelta(days=1)
-    
+    # domingo = 6
+    if agora.weekday() == 6:
+        if agora.hour >= 18:
+            return agora.date() + timedelta(days=1)
+
+    else:
+        if agora.hour >= 21:
+            return agora.date() + timedelta(days=1)
+
     return agora.date()
 
 def obter_data_cronograma_formatada():
