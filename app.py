@@ -42,19 +42,24 @@ def limite_plano(plano, aulas_contratadas=None):
     return 0
 
 def resumo_aulas_mes(cursor, aluno_id, plano):
-    inicio_mes = date.today().replace(day=1).strftime("%Y-%m-%d")
-    hoje = date.today().strftime("%Y-%m-%d")
+    data_base = obter_data_base()
+
+    inicio_mes = data_base.replace(day=1).strftime("%Y-%m-%d")
+    fim_mes = (data_base.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    fim_mes = fim_mes.strftime("%Y-%m-%d")
 
     cursor.execute("""
         SELECT COUNT(*) AS total
         FROM agendamentos
         WHERE aluno_id = %s
         AND data_agendamento BETWEEN %s AND %s
-    """, (aluno_id, inicio_mes, hoje))
+    """, (aluno_id, inicio_mes, fim_mes))
 
     usadas = cursor.fetchone()["total"]
+
     cursor.execute("SELECT aulas_contratadas FROM alunos WHERE id = %s", (aluno_id,))
     aluno = cursor.fetchone()
+
     limite = limite_plano(plano, aluno["aulas_contratadas"])
 
     if limite >= 9999:
