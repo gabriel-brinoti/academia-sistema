@@ -769,11 +769,14 @@ def aceitar_contrato():
     cursor = conn.cursor()
 
     cursor.execute("""
-        UPDATE alunos
-        SET aceitou_contrato = TRUE,
-            data_aceite_contrato = %s
-        WHERE id = %s
-    """, (datetime.utcnow() - timedelta(hours=3)).strftime("%Y-%m-%d %H:%M:%S"), aluno_id)
+    UPDATE alunos
+    SET aceitou_contrato = TRUE,
+        data_aceite_contrato = %s
+    WHERE id = %s
+""", (
+    (datetime.utcnow() - timedelta(hours=3)).strftime("%Y-%m-%d %H:%M:%S"),
+    aluno_id
+))
 
     data_base = obter_data_base()
     data_agendamento = data_base.strftime("%Y-%m-%d")
