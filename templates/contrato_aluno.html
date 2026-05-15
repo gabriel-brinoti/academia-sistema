@@ -18,16 +18,18 @@
     </p>
 
     <div style="text-align:left; max-height:350px; overflow:auto; border:1px solid #ddd; padding:15px; border-radius:10px; margin-bottom:20px;">
-        <p><strong>CONTRATO DE PRESTAÇÃO DE SERVIÇOS – STUDIO DL FIT</strong></p>
-        <p>
-            O(a) aluno(a) declara estar ciente das regras da academia, planos contratados,
-            agendamentos, pagamentos, uso da estrutura, responsabilidades e demais termos
-            informados pela DL Fit.
-        </p>
-        <p>
-            Ao aceitar, o(a) aluno(a) confirma que leu e concorda com os termos do contrato.
-        </p>
-    </div>
+
+    <p>
+        Para continuar utilizando o sistema da academia, leia e aceite os termos do contrato.
+    </p>
+
+    <a href="{{ url_for('static', filename='contrato_dlfit.pdf') }}"
+       target="_blank"
+       class="btn">
+       Ver contrato completo
+    </a>
+
+</div>
 
     <form method="POST" action="{{ url_for('aceitar_contrato') }}">
         <button type="submit">Li e concordo</button>
