@@ -762,7 +762,7 @@ def aceitar_contrato():
     aluno_id = session.get("aluno_pendente_contrato")
     aula_id = session.get("aula_pendente_contrato")
 
-    if not aluno_id:
+    if not aluno_id or not aula_id:
         return redirect(url_for("cronograma"))
 
     conn = conectar()
