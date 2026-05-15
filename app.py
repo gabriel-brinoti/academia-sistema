@@ -245,7 +245,7 @@ def init_db():
             ("Quinta-feira", "20:00", "MUSCULAÇÃO", 10),
             ("Sexta-feira", "05:00", "MUSCULAÇÃO", 10),
             ("Sexta-feira", "06:00", "MUSCULAÇÃO", 10),
-            ("Sexta-feira", "07:00", "Flex Fit", 7),
+            ("Sexta-feira", "07:00", "FLEX FIT", 7),
             ("Sexta-feira", "07:00", "MUSCULAÇÃO", 10),
             ("Sexta-feira", "08:00", "ACROYOGA", 10),
             ("Sexta-feira", "08:00", "MUSCULAÇÃO", 10),
