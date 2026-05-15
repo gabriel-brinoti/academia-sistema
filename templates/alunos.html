@@ -40,6 +40,7 @@
             <th>Vencimento</th>
             <th>Status</th>
             <th>Ações</th>
+            <th>Contrato</th>
         </tr>
         {% for aluno in alunos %}
         <tr>
@@ -53,6 +54,13 @@
             <td>
                 <a class="btn" href="{{ url_for('editar_aluno', id=aluno.id) }}">Editar</a>
                 <a class="btn btn-danger" href="{{ url_for('excluir_aluno', id=aluno.id) }}" onclick="return confirm('Deseja excluir este aluno?')">Excluir</a>
+            </td>
+            <td>
+                {% if aluno.aceitou_contrato %}
+                Aceito em {{ aluno.data_aceite_contrato }}
+                {% else %}
+                Não aceito
+                {% endif %}
             </td>
         </tr>
         {% endfor %}

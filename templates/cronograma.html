@@ -5,6 +5,7 @@
     <title>Cronograma - DL Fit</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body>
 <div class="navbar">
     <div class="navbar-brand">
@@ -47,11 +48,12 @@
                 <form method="POST" action="{{ url_for('agendar_aula', aula_id=aula.id) }}">
                     <input type="text" name="nome_aluno" list="lista_alunos" required>
 
-<datalist id="lista_alunos">
-    {% for aluno in alunos %}
-        <option value="{{ aluno.nome }}">
-    {% endfor %}
-</datalist>
+                    <datalist id="lista_alunos">
+                        {% for aluno in alunos %}
+                            <option value="{{ aluno.nome }}">
+                        {% endfor %}
+                    </datalist>
+
                     <button type="submit">Entrar na aula</button>
                 </form>
             {% endif %}

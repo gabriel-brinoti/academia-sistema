@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Contrato - DL Fit</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="login-box">
+    <div class="logo-center">
+        <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
+    </div>
+
+    <h1 class="section-title">Contrato e Termos de Uso</h1>
+
+    <p class="subtitulo">
+        Para continuar com o agendamento, leia e aceite os termos da academia.
+    </p>
+
+    <div style="text-align:left; max-height:350px; overflow:auto; border:1px solid #ddd; padding:15px; border-radius:10px; margin-bottom:20px;">
+        <p><strong>CONTRATO DE PRESTAÇÃO DE SERVIÇOS – STUDIO DL FIT</strong></p>
+        <p>
+            O(a) aluno(a) declara estar ciente das regras da academia, planos contratados,
+            agendamentos, pagamentos, uso da estrutura, responsabilidades e demais termos
+            informados pela DL Fit.
+        </p>
+        <p>
+            Ao aceitar, o(a) aluno(a) confirma que leu e concorda com os termos do contrato.
+        </p>
+    </div>
+
+    <form method="POST" action="{{ url_for('aceitar_contrato') }}">
+        <button type="submit">Li e concordo</button>
+    </form>
+
+    <div class="footer-actions">
+        <a href="{{ url_for('cronograma') }}" class="btn-voltar">Voltar</a>
+    </div>
+</div>
+</body>
+</html>

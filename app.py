@@ -142,6 +142,14 @@ def init_db():
     cursor.execute("""
     ALTER TABLE alunos ADD COLUMN IF NOT EXISTS aulas_contratadas INTEGER
 """)
+    
+    cursor.execute("""
+    ALTER TABLE alunos ADD COLUMN IF NOT EXISTS aceitou_contrato BOOLEAN DEFAULT FALSE
+""")
+
+    cursor.execute("""
+    ALTER TABLE alunos ADD COLUMN IF NOT EXISTS data_aceite_contrato TEXT
+""")
 
     conn.commit()
 
@@ -150,97 +158,106 @@ def init_db():
 
     if total_aulas == 0:
         aulas_padrao = [
-            ("Segunda-feira", "05:00", "Musculação", 10),
-            ("Segunda-feira", "06:00", "Musculação", 10),
-            ("Segunda-feira", "07:00", "Musculação", 10),
-            ("Segunda-feira", "07:00", "Neopilates", 7),
-            ("Segunda-feira", "08:00", "Musculação", 10),
-            ("Segunda-feira", "08:00", "Acroyoga", 7),
-            ("Segunda-feira", "09:00", "Musculação", 10),
-            ("Segunda-feira", "09:00", "Neopilates", 7),
-            ("Segunda-feira", "10:00", "Musculação", 10),
-            ("Segunda-feira", "15:00", "Musculação", 10),
-            ("Segunda-feira", "16:00", "Musculação", 10),
-            ("Segunda-feira", "16:00", "Neopilates", 7),
-            ("Segunda-feira", "17:00", "Musculação", 10),
-            ("Segunda-feira", "17:00", "Acroyoga", 7),
-            ("Segunda-feira", "18:00", "Musculação", 10),
-            ("Segunda-feira", "18:00", "Dance Fit / C.Fight", 7),
-            ("Segunda-feira", "19:00", "Musculação", 10),
-            ("Segunda-feira", "19:00", "Circo / Step Dance", 7),
-            ("Segunda-feira", "20:00", "Musculação", 10),
-            ("Segunda-feira", "20:00", "Acroyoga", 7),
-            ("Terca-feira", "05:00", "Neopilates", 7),
-            ("Terca-feira", "06:00", "Musculação", 10),
-            ("Terca-feira", "07:00", "Musculação", 10),
-            ("Terca-feira", "07:00", "Circo / Spin Fit", 7),
-            ("Terca-feira", "08:00", "Musculação", 10),
-            ("Terca-feira", "08:00", "Work HIIT", 7),
-            ("Terca-feira", "09:00", "Musculação", 10),
-            ("Terca-feira", "09:00", "NeoKids", 7),
-            ("Terca-feira", "10:00", "Musculação", 10),
-            ("Terca-feira", "15:00", "Musculação", 10),
-            ("Terca-feira", "16:00", "Musculação", 10),
-            ("Terca-feira", "16:00", "NeoKids", 7),
-            ("Terca-feira", "17:00", "Musculação", 10),
-            ("Terca-feira", "18:00", "Musculação", 10),
-            ("Terca-feira", "18:00", "Neopilates / Spin Fit", 7),
-            ("Terca-feira", "19:00", "Musculação", 10),
-            ("Terca-feira", "19:00", "Circo", 7),
-            ("Terca-feira", "20:00", "Musculação", 10),
-            ("Quarta-feira", "05:00", "Musculação", 10),
-            ("Quarta-feira", "06:00", "Musculação", 10),
-            ("Quarta-feira", "07:00", "Musculação", 10),
-            ("Quarta-feira", "07:00", "Neopilates", 7),
-            ("Quarta-feira", "08:00", "Musculação", 10),
-            ("Quarta-feira", "08:00", "Acroyoga", 7),
-            ("Quarta-feira", "09:00", "Musculação", 10),
-            ("Quarta-feira", "09:00", "Cross Fight", 7),
-            ("Quarta-feira", "10:00", "Musculação", 10),
-            ("Quarta-feira", "15:00", "Musculação", 10),
-            ("Quarta-feira", "16:00", "Musculação", 10),
-            ("Quarta-feira", "16:00", "Neopilates", 7),
-            ("Quarta-feira", "17:00", "Musculação", 10),
-            ("Quarta-feira", "17:00", "Acroyoga", 7),
-            ("Quarta-feira", "18:00", "Musculação", 10),
-            ("Quarta-feira", "18:00", "Dance Fit / C.Fight", 7),
-            ("Quarta-feira", "19:00", "Musculação", 10),
-            ("Quarta-feira", "19:00", "Stepdance / Circo", 7),
-            ("Quarta-feira", "20:00", "Musculação", 10),
-            ("Quarta-feira", "20:00", "Acroyoga", 7),
-            ("Quinta-feira", "05:00", "Neopilates", 7),
-            ("Quinta-feira", "06:00", "Musculação", 10),
-            ("Quinta-feira", "07:00", "Circo / Spin Fit", 7),
-            ("Quinta-feira", "07:00", "Musculação", 10),
-            ("Quinta-feira", "08:00", "Work HIIT", 7),
-            ("Quinta-feira", "08:00", "Musculação", 10),
-            ("Quinta-feira", "09:00", "NeoKids", 7),
-            ("Quinta-feira", "09:00", "Musculação", 10),
-            ("Quinta-feira", "10:00", "Musculação", 10),
-            ("Quinta-feira", "15:00", "Musculação", 10),
-            ("Quinta-feira", "16:00", "NeoKids", 7),
-            ("Quinta-feira", "16:00", "Musculação", 10),
-            ("Quinta-feira", "17:00", "Musculação", 10),
-            ("Quinta-feira", "18:00", "Neopilates / Spin Fit", 7),
-            ("Quinta-feira", "18:00", "Musculação", 10),
-            ("Quinta-feira", "19:00", "Circo / Work Hiit", 7),
-            ("Quinta-feira", "19:00", "Musculação", 10),
-            ("Quinta-feira", "20:00", "Musculação", 10),
-            ("Sexta-feira", "05:00", "Musculação", 10),
-            ("Sexta-feira", "06:00", "Musculação", 10),
+            ("Segunda-feira", "05:00", "MUSCULAÇÃO", 10),
+            ("Segunda-feira", "06:00", "MUSCULAÇÃO", 10),
+            ("Segunda-feira", "07:00", "MUSCULAÇÃO", 10),
+            ("Segunda-feira", "07:00", "NEOPILATES", 7),
+            ("Segunda-feira", "08:00", "MUSCULAÇÃO", 10),
+            ("Segunda-feira", "08:00", "ACROYOGA", 7),
+            ("Segunda-feira", "09:00", "MUSCULAÇÃO", 10),
+            ("Segunda-feira", "09:00", "NEOPILATES", 7),
+            ("Segunda-feira", "10:00", "MUSCULAÇÃO", 10),
+            ("Segunda-feira", "15:00", "MUSCULAÇÃO", 10),
+            ("Segunda-feira", "16:00", "MUSCULAÇÃO", 10),
+            ("Segunda-feira", "16:00", "NEOPILATES", 7),
+            ("Segunda-feira", "17:00", "MUSCULAÇÃO", 10),
+            ("Segunda-feira", "17:00", "ACROYOGA", 7),
+            ("Segunda-feira", "18:00", "MUSCULAÇÃO", 10),
+            ("Segunda-feira", "18:00", "DANCE FIT", 7),
+            ("Segunda-feira", "18:00", "C.FIGHT", 7),
+            ("Segunda-feira", "19:00", "MUSCULAÇÃO", 10),
+            ("Segunda-feira", "19:00", "CIRCO", 7),
+            ("Segunda-feira", "19:00", "STEP DANCE", 7),
+            ("Segunda-feira", "20:00", "MUSCULAÇÃO", 10),
+            ("Segunda-feira", "20:00", "ACROYOGA", 7),
+            ("Terca-feira", "05:00", "NEOPILATES", 7),
+            ("Terca-feira", "06:00", "MUSCULAÇÃO", 10),
+            ("Terca-feira", "07:00", "MUSCULAÇÃO", 10),
+            ("Terca-feira", "07:00", "CIRCO", 7),
+            ("Terca-feira", "07:00", "SPIN FIT", 7),
+            ("Terca-feira", "08:00", "MUSCULAÇÃO", 10),
+            ("Terca-feira", "08:00", "LEG WORK", 7),
+            ("Terca-feira", "09:00", "MUSCULAÇÃO", 10),
+            ("Terca-feira", "09:00", "NEOKIDS", 7),
+            ("Terca-feira", "10:00", "MUSCULAÇÃO", 10),
+            ("Terca-feira", "15:00", "MUSCULAÇÃO", 10),
+            ("Terca-feira", "16:00", "MUSCULAÇÃO", 10),
+            ("Terca-feira", "16:00", "NEOKIDS", 7),
+            ("Terca-feira", "17:00", "MUSCULAÇÃO", 10),
+            ("Terca-feira", "18:00", "MUSCULAÇÃO", 10),
+            ("Terca-feira", "18:00", "NEOPILATES", 7),
+            ("Terca-feira", "18:00", "SPIN FIT", 7),
+            ("Terca-feira", "19:00", "MUSCULAÇÃO", 10),
+            ("Terca-feira", "19:00", "CIRCO", 7),
+            ("Terca-feira", "20:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "05:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "06:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "07:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "07:00", "NEOPILATES", 7),
+            ("Quarta-feira", "08:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "08:00", "ACROYOGA", 7),
+            ("Quarta-feira", "09:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "09:00", "CROSS FIGHT", 7),
+            ("Quarta-feira", "10:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "15:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "16:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "16:00", "NEOPILATES", 7),
+            ("Quarta-feira", "17:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "17:00", "ACROYOGA", 7),
+            ("Quarta-feira", "18:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "18:00", "DANCE FIT", 7),
+            ("Quarta-feira", "18:00", "C.FIGHT", 7),
+            ("Quarta-feira", "19:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "19:00", "STEP DANCE", 7),
+            ("Quarta-feira", "19:00", "CIRCO", 7),
+            ("Quarta-feira", "20:00", "MUSCULAÇÃO", 10),
+            ("Quarta-feira", "20:00", "ACROYOGA", 7),
+            ("Quinta-feira", "05:00", "NEOPILATES", 7),
+            ("Quinta-feira", "06:00", "MUSCULAÇÃO", 10),
+            ("Quinta-feira", "07:00", "CIRCO", 7),
+            ("Quinta-feira", "07:00", "SPIN FIT", 7),
+            ("Quinta-feira", "07:00", "MUSCULAÇÃO", 10),
+            ("Quinta-feira", "08:00", "LEG WORK", 7),
+            ("Quinta-feira", "08:00", "MUSCULAÇÃO", 10),
+            ("Quinta-feira", "09:00", "NEOKIDS", 7),
+            ("Quinta-feira", "09:00", "MUSCULAÇÃO", 10),
+            ("Quinta-feira", "10:00", "MUSCULAÇÃO", 10),
+            ("Quinta-feira", "15:00", "MUSCULAÇÃO", 10),
+            ("Quinta-feira", "16:00", "NEOKIDS", 7),
+            ("Quinta-feira", "16:00", "MUSCULAÇÃO", 10),
+            ("Quinta-feira", "17:00", "MUSCULAÇÃO", 10),
+            ("Quinta-feira", "18:00", "NEOPILATES", 7),
+            ("Quinta-feira", "18:00", "SPIN FIT", 7),
+            ("Quinta-feira", "18:00", "MUSCULAÇÃO", 10),
+            ("Quinta-feira", "19:00", "CIRCO", 7),
+            ("Quinta-feira", "19:00", "LEG WORK", 7),
+            ("Quinta-feira", "19:00", "MUSCULAÇÃO", 10),
+            ("Quinta-feira", "20:00", "MUSCULAÇÃO", 10),
+            ("Sexta-feira", "05:00", "MUSCULAÇÃO", 10),
+            ("Sexta-feira", "06:00", "MUSCULAÇÃO", 10),
             ("Sexta-feira", "07:00", "Flex Fit", 7),
-            ("Sexta-feira", "07:00", "Musculação", 10),
-            ("Sexta-feira", "08:00", "Acroyoga", 10),
-            ("Sexta-feira", "08:00", "Musculação", 10),
-            ("Sexta-feira", "09:00", "Musculação", 10),
-            ("Sexta-feira", "10:00", "Musculação", 10),
-            ("Sexta-feira", "15:00", "Musculação", 10),
-            ("Sexta-feira", "16:00", "Musculação", 10),
-            ("Sexta-feira", "17:00", "Musculação", 10),
-            ("Sexta-feira", "17:00", "Cross Fight", 7),
-            ("Sexta-feira", "18:00", "Musculação", 10),
-            ("Sexta-feira", "18:00", "Spin Fit", 7),
-            ("Sexta-feira", "19:00", "Musculação", 10),
+            ("Sexta-feira", "07:00", "MUSCULAÇÃO", 10),
+            ("Sexta-feira", "08:00", "ACROYOGA", 10),
+            ("Sexta-feira", "08:00", "MUSCULAÇÃO", 10),
+            ("Sexta-feira", "09:00", "MUSCULAÇÃO", 10),
+            ("Sexta-feira", "10:00", "MUSCULAÇÃO", 10),
+            ("Sexta-feira", "15:00", "MUSCULAÇÃO", 10),
+            ("Sexta-feira", "16:00", "MUSCULAÇÃO", 10),
+            ("Sexta-feira", "17:00", "MUSCULAÇÃO", 10),
+            ("Sexta-feira", "17:00", "CROSS FIGHT", 7),
+            ("Sexta-feira", "18:00", "MUSCULAÇÃO", 10),
+            ("Sexta-feira", "18:00", "SPIN FIT", 7),
+            ("Sexta-feira", "19:00", "MUSCULAÇÃO", 10),
         ]
 
         cursor.executemany("""
@@ -646,6 +663,8 @@ def agendar_aula(aula_id):
 
     aluno_id = aluno["id"]
 
+    
+
     # buscar aula
     cursor.execute("SELECT * FROM aulas WHERE id = %s", (aula_id,))
     aula = cursor.fetchone()
@@ -699,6 +718,12 @@ def agendar_aula(aula_id):
     if cursor.fetchone():
         conn.close()
         return redirect(url_for("cronograma"))
+    
+    if not aluno["aceitou_contrato"]:
+        session["aluno_pendente_contrato"] = aluno["id"]
+        session["aula_pendente_contrato"] = aula_id
+        conn.close()
+        return redirect(url_for("contrato_aluno"))
 
     # salvar
     cursor.execute("""
@@ -725,7 +750,47 @@ def sair_professor():
     session.pop("professor_liberado", None)
     return redirect(url_for("cronograma"))
 
+@app.route("/contrato_aluno")
+def contrato_aluno():
+    if "aluno_pendente_contrato" not in session:
+        return redirect(url_for("cronograma"))
 
+    return render_template("contrato_aluno.html")
+
+@app.route("/aceitar_contrato", methods=["POST"])
+def aceitar_contrato():
+    aluno_id = session.get("aluno_pendente_contrato")
+    aula_id = session.get("aula_pendente_contrato")
+
+    if not aluno_id:
+        return redirect(url_for("cronograma"))
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE alunos
+        SET aceitou_contrato = TRUE,
+            data_aceite_contrato = %s
+        WHERE id = %s
+    """, (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), aluno_id))
+
+    data_base = obter_data_base()
+    data_agendamento = data_base.strftime("%Y-%m-%d")
+
+    cursor.execute("""
+        INSERT INTO agendamentos (aluno_id, aula_id, data_agendamento)
+        VALUES (%s, %s, %s)
+        ON CONFLICT DO NOTHING
+    """, (aluno_id, aula_id, data_agendamento))
+
+    conn.commit()
+    conn.close()
+
+    session.pop("aluno_pendente_contrato", None)
+    session.pop("aula_pendente_contrato", None)
+
+    return render_template("agendamento_sucesso.html")
 init_db()
 
 if __name__ == "__main__":
