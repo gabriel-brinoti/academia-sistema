@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ titulo }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="login-box">
+
+    <div class="logo-center">
+        <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
+    </div>
+
+    <h1 class="section-title">{{ titulo }}</h1>
+
+    <p class="subtitulo">
+        {{ mensagem }}
+    </p>
+
+    <div class="footer-actions">
+        <a href="{{ url_for('cronograma') }}" class="btn-voltar">
+            Voltar ao cronograma
+        </a>
+    </div>
+
+</div>
+
+</body>
+</html>

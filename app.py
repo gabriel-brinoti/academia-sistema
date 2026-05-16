@@ -704,9 +704,21 @@ def agendar_aula(aula_id):
     
     limite = limite_plano(aluno["plano"], aluno["aulas_contratadas"])
 
-    if aulas_usadas_mes >= limite or ocupadas >= aula["capacidade"]:
+    if aulas_usadas_mes >= limite:
         conn.close()
-        return redirect(url_for("cronograma"))
+        return render_template(
+        "mensagem.html",
+        titulo="Limite de aulas atingido",
+        mensagem="Você atingiu o limite de aulas do seu plano neste mês. Para liberar novas aulas, entre em contato com a administração da academia."
+    )
+
+    if ocupadas >= aula["capacidade"]:
+        conn.close()
+        return render_template(
+        "mensagem.html",
+        titulo="Aula lotada",
+        mensagem="Esta aula já atingiu o limite de vagas disponíveis."
+    )
 
     # evitar duplicado
     cursor.execute("""
