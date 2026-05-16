@@ -21,14 +21,42 @@
     <h1 class="section-title">Editar Aluno</h1>
     <p class="subtitulo">Atualize os dados do aluno</p>
     <form method="POST">
-        <input type="text" name="nome" value="{{ aluno.nome }}" required>
-        <input type="text" name="telefone" value="{{ aluno.telefone }}" required>
-        <input type="text" name="plano" value="{{ aluno.plano }}" required>
-        <label>Aulas contratadas no mês:</label>
-<input type="number" name="aulas_contratadas" value="{{ aluno.aulas_contratadas or '' }}" placeholder="Ex: 4, 12 ou deixe vazio para padrão">
-        <label>Data de nascimento</label>
-        <input type="date" name="data_nascimento" value="{{ aluno.data_nascimento }}" required>
-        <input type="date" name="vencimento" value="{{ aluno.vencimento }}" required>
+        <label>Nome completo:</label>
+<input type="text" name="nome" value="{{ aluno.nome }}" required>
+
+<label>Telefone:</label>
+<input type="text" name="telefone" value="{{ aluno.telefone }}">
+
+<label>Tipo de plano:</label>
+<input type="text" name="plano" value="{{ aluno.plano }}" required>
+
+<label>Quantidade total de aulas:</label>
+<input type="number" name="aulas_contratadas" value="{{ aluno.aulas_contratadas or '' }}">
+
+<label>Data de nascimento:</label>
+<input type="date" name="data_nascimento" value="{{ aluno.data_nascimento }}">
+
+<label>Data de vencimento/fim:</label>
+<input type="date" name="vencimento" value="{{ aluno.vencimento }}" required>
+
+<label>Frequência:</label>
+<select name="frequencia">
+    <option value="">Selecione</option>
+
+    <option value="1x_semana" {% if aluno.frequencia == '1x_semana' %}selected{% endif %}>1x por semana</option>
+
+    <option value="2x_semana" {% if aluno.frequencia == '2x_semana' %}selected{% endif %}>2x por semana</option>
+
+    <option value="3x_semana" {% if aluno.frequencia == '3x_semana' %}selected{% endif %}>3x por semana</option>
+
+    <option value="4x_semana" {% if aluno.frequencia == '4x_semana' %}selected{% endif %}>4x por semana</option>
+
+    <option value="5x_semana" {% if aluno.frequencia == '5x_semana' %}selected{% endif %}>5x por semana</option>
+
+    <option value="1x_dia" {% if aluno.frequencia == '1x_dia' %}selected{% endif %}>1x por dia</option>
+
+    <option value="2x_dia" {% if aluno.frequencia == '2x_dia' %}selected{% endif %}>2x por dia</option>
+</select>
         <label>Status do pagamento</label>
         <select name="status_pagamento" required>
             <option value="Pago" {% if aluno.status_pagamento == 'Pago' %}selected{% endif %}>Pago</option>

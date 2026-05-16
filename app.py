@@ -84,6 +84,21 @@ def calcular_idade(data_nascimento):
     except Exception:
         return None
 
+def limite_diario_aluno(aluno):
+    frequencia = str(aluno.get("frequencia") or "").lower().strip()
+    plano = remover_acentos(str(aluno.get("plano") or "").upper().strip())
+
+    if plano == "GYMPASS":
+        return 1
+
+    if frequencia == "1x_dia":
+        return 1
+
+    if frequencia == "2x_dia" or plano == "LIVRE":
+        return 2
+
+    return None
+
 
 def init_db():
     conn = conectar()
@@ -149,6 +164,14 @@ def init_db():
 
     cursor.execute("""
     ALTER TABLE alunos ADD COLUMN IF NOT EXISTS data_aceite_contrato TEXT
+""")
+    
+    cursor.execute("""
+    ALTER TABLE alunos ADD COLUMN IF NOT EXISTS frequencia TEXT
+""")
+
+    cursor.execute("""
+    ALTER TABLE alunos ADD COLUMN IF NOT EXISTS limite_diario INTEGER
 """)
 
     conn.commit()
@@ -276,8 +299,8 @@ from datetime import datetime, timedelta
 def obter_data_base():
     agora = datetime.utcnow() - timedelta(hours=3)
 
-    # domingo = 6
-    if agora.weekday() == 6:
+    # domingo = 6 
+    if   agora.weekday() == 6:
         if agora.hour >= 18:
             return agora.date() + timedelta(days=1)
 
@@ -483,9 +506,9 @@ def novo_aluno():
         cursor.execute("""
             INSERT INTO alunos (
             nome, telefone, plano, vencimento, status_pagamento,
-            observacao, aulas_restantes, usuario, senha, data_nascimento, data_inicio, aulas_contratadas
+            observacao, aulas_restantes, usuario, senha, data_nascimento, data_inicio, aulas_contratadas, frequencia    
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
             nome,
             request.form["telefone"],
@@ -498,7 +521,8 @@ def novo_aluno():
             "1234",
             request.form.get("data_nascimento", ""),
             request.form.get("data_inicio", ""),
-            request.form.get("aulas_contratadas") or None
+            request.form.get("aulas_contratadas") or None,
+            request.form.get("frequencia", "")
         ))
 
         conn.commit()
@@ -520,7 +544,7 @@ def editar_aluno(id):
         cursor.execute("""
             UPDATE alunos
             SET nome=%s, telefone=%s, plano=%s, vencimento=%s,
-                status_pagamento=%s, observacao=%s, data_nascimento=%s , data_inicio=%s, aulas_contratadas=%s
+                status_pagamento=%s, observacao=%s, data_nascimento=%s , data_inicio=%s, aulas_contratadas=%s, frequencia=%s
             WHERE id=%s
         """, (
             request.form["nome"],
@@ -532,6 +556,7 @@ def editar_aluno(id):
             request.form.get("data_nascimento", ""),
             request.form.get("data_inicio", ""),
             request.form.get("aulas_contratadas") or None,
+            request.form.get("frequencia", ""),
             id
         ))
         conn.commit()
@@ -591,13 +616,14 @@ def importar_excel():
                     data_inicio = "" if pd.isna(row.get("DataInicio")) else str(row.get("DataInicio"))
                     aulas_contratadas = None if pd.isna(row.get("AulasContratadas")) else int(row.get("AulasContratadas"))
 
+                    frequencia = "" if pd.isna(row.get("Frequencia")) else str(row.get("Frequencia"))
+
                     cursor.execute("""
                         INSERT INTO alunos (
                         nome, telefone, plano, vencimento, status_pagamento,
-                        observacao, aulas_restantes, usuario, senha,
-                        data_nascimento, data_inicio, aulas_contratadas
+                        observacao, aulas_restantes, usuario, senha, data_nascimento, data_inicio, aulas_contratadas, frequencia
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     nome,
                     telefone,
@@ -610,7 +636,8 @@ def importar_excel():
                     "1234",
                     data_nascimento,
                     data_inicio,
-                    aulas_contratadas
+                    aulas_contratadas,
+                    frequencia
                 ))
 
                 conn.commit()
@@ -681,6 +708,26 @@ def agendar_aula(aula_id):
     data_base = obter_data_base()
     data_agendamento = data_base.strftime("%Y-%m-%d")
 
+    limite_diario = limite_diario_aluno(aluno)
+
+    if limite_diario:
+        cursor.execute("""
+            SELECT COUNT(*) AS total
+            FROM agendamentos
+            WHERE aluno_id = %s
+            AND data_agendamento = %s
+        """, (aluno_id, data_agendamento))
+
+        aulas_usadas_dia = cursor.fetchone()["total"]
+
+        if aulas_usadas_dia >= limite_diario:
+            conn.close()
+            return render_template(
+                "mensagem.html",
+                titulo="Limite diário atingido",
+                mensagem="Você atingiu o limite de aulas permitidas para hoje. Para mais informações, entre em contato com a administração da academia."
+            )
+
     # vagas ocupadas
     cursor.execute("""
         SELECT COUNT(*) AS total
@@ -694,11 +741,10 @@ def agendar_aula(aula_id):
     hoje = data_base.strftime("%Y-%m-%d")
 
     cursor.execute("""
-        SELECT COUNT(*) AS total
-        FROM agendamentos
-        WHERE aluno_id = %s
-        AND data_agendamento BETWEEN %s AND %s
-    """, (aluno_id, inicio_mes, hoje))
+    SELECT COUNT(*) AS total
+    FROM agendamentos
+    WHERE aluno_id = %s
+""", (aluno_id,))
 
     aulas_usadas_mes = cursor.fetchone()["total"]
     
