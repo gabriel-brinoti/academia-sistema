@@ -42,29 +42,28 @@ def limite_plano(plano, aulas_contratadas=None):
     return 0
 
 def resumo_aulas_mes(cursor, aluno_id, plano):
-    data_base = obter_data_base()
-
-    inicio_mes = data_base.replace(day=1).strftime("%Y-%m-%d")
-    fim_mes = (data_base.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-    fim_mes = fim_mes.strftime("%Y-%m-%d")
-
     cursor.execute("""
         SELECT COUNT(*) AS total
         FROM agendamentos
         WHERE aluno_id = %s
-        AND data_agendamento BETWEEN %s AND %s
-    """, (aluno_id, inicio_mes, fim_mes))
+    """, (aluno_id,))
 
-    usadas = cursor.fetchone()["total"]
+    usadas_sistema = cursor.fetchone()["total"]
 
-    cursor.execute("SELECT aulas_contratadas FROM alunos WHERE id = %s", (aluno_id,))
+    cursor.execute("""
+        SELECT aulas_contratadas, aulas_usadas_iniciais
+        FROM alunos
+        WHERE id = %s
+    """, (aluno_id,))
+
     aluno = cursor.fetchone()
 
     limite = limite_plano(plano, aluno["aulas_contratadas"])
+    usadas = usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
 
     if limite >= 9999:
         return f"{usadas} / ilimitado"
-    
+
     restantes = max(limite - usadas, 0)
     return f"{usadas} / {limite} usadas - restam {restantes}"
 
@@ -509,11 +508,12 @@ def novo_aluno():
 
         cursor.execute("""
             INSERT INTO alunos (
-            nome, telefone, plano, vencimento, status_pagamento,
-            observacao, aulas_restantes, usuario, senha, data_nascimento, data_inicio, aulas_contratadas, frequencia    
-            )aulas_usadas_iniciais
+                nome, telefone, plano, vencimento, status_pagamento,
+                observacao, aulas_restantes, usuario, senha, data_nascimento,
+                data_inicio, aulas_contratadas, frequencia, aulas_usadas_iniciais
+            )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
+        """, (
             nome,
             request.form["telefone"],
             request.form["plano"],
@@ -527,7 +527,7 @@ def novo_aluno():
             request.form.get("data_inicio", ""),
             request.form.get("aulas_contratadas") or None,
             request.form.get("frequencia", ""),
-            request.form.get("aulas_usadas_iniciais") or 0,
+            request.form.get("aulas_usadas_iniciais") or 0
         ))
 
         conn.commit()
@@ -549,8 +549,9 @@ def editar_aluno(id):
         cursor.execute("""
             UPDATE alunos
             SET nome=%s, telefone=%s, plano=%s, vencimento=%s,
-                status_pagamento=%s, observacao=%s, data_nascimento=%s , data_inicio=%s, aulas_contratadas=%s,
-                frequencia=%s, aulas_usadas_iniciais=%s
+                status_pagamento=%s, observacao=%s, data_nascimento=%s,
+                data_inicio=%s, aulas_contratadas=%s, frequencia=%s,
+                aulas_usadas_iniciais=%s
             WHERE id=%s
         """, (
             request.form["nome"],
@@ -570,27 +571,11 @@ def editar_aluno(id):
         conn.close()
         return redirect(url_for("alunos"))
 
-    cursor.execute("""
-    SELECT COUNT(*) AS total
-    FROM agendamentos
-    WHERE aluno_id = %s
-    """, (aluno_id,))
-
-    usadas_sistema = cursor.fetchone()["total"]
-
-    cursor.execute("""
-    SELECT aulas_contratadas, aulas_usadas_iniciais
-    FROM alunos
-    WHERE id = %s
-    """, (aluno_id,))
-
+    cursor.execute("SELECT * FROM alunos WHERE id = %s", (id,))
     aluno = cursor.fetchone()
+    conn.close()
+    return render_template("editar_aluno.html", aluno=aluno)
 
-    usadas = usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
-    limite = aluno["aulas_contratadas"] or 0
-    restantes = max(limite - usadas, 0)
-
-    return f"{usadas} / {limite} usadas - restam {restantes}"
 
 @app.route("/excluir_aluno/<int:id>")
 def excluir_aluno(id):
@@ -625,7 +610,7 @@ def importar_excel():
 
                 for _, row in df.iterrows():
                     nome = str(row.get("Nome", "")).strip()
-                    if not nome:
+                    if not nome or nome.lower() == "nan":
                         continue
 
                     usuario = remover_acentos(nome.split()[0].lower())
@@ -638,30 +623,32 @@ def importar_excel():
                     data_nascimento = "" if pd.isna(row.get("DataNascimento")) else str(row.get("DataNascimento"))
                     data_inicio = "" if pd.isna(row.get("DataInicio")) else str(row.get("DataInicio"))
                     aulas_contratadas = None if pd.isna(row.get("AulasContratadas")) else int(row.get("AulasContratadas"))
-
                     frequencia = "" if pd.isna(row.get("Frequencia")) else str(row.get("Frequencia"))
+                    aulas_usadas_iniciais = 0 if pd.isna(row.get("AulasUsadasIniciais")) else int(row.get("AulasUsadasIniciais"))
 
                     cursor.execute("""
                         INSERT INTO alunos (
-                        nome, telefone, plano, vencimento, status_pagamento,
-                        observacao, aulas_restantes, usuario, senha, data_nascimento, data_inicio, aulas_contratadas, frequencia
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    nome,
-                    telefone,
-                    plano,
-                    vencimento,
-                    status,
-                    observacao,
-                    12,
-                    usuario,
-                    "1234",
-                    data_nascimento,
-                    data_inicio,
-                    aulas_contratadas,
-                    frequencia
-                ))
+                            nome, telefone, plano, vencimento, status_pagamento,
+                            observacao, aulas_restantes, usuario, senha, data_nascimento,
+                            data_inicio, aulas_contratadas, frequencia, aulas_usadas_iniciais
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        nome,
+                        telefone,
+                        plano,
+                        vencimento,
+                        status,
+                        observacao,
+                        12,
+                        usuario,
+                        "1234",
+                        data_nascimento,
+                        data_inicio,
+                        aulas_contratadas,
+                        frequencia,
+                        aulas_usadas_iniciais
+                    ))
 
                 conn.commit()
                 conn.close()
@@ -769,17 +756,18 @@ def agendar_aula(aula_id):
     WHERE aluno_id = %s
 """, (aluno_id,))
 
-    aulas_usadas_mes = cursor.fetchone()["total"]
-    
+    aulas_usadas_sistema = cursor.fetchone()["total"]
+    aulas_usadas_total = aulas_usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
+
     limite = limite_plano(aluno["plano"], aluno["aulas_contratadas"])
 
-    if aulas_usadas_mes >= limite:
+    if limite < 9999 and aulas_usadas_total >= limite:
         conn.close()
         return render_template(
-        "mensagem.html",
-        titulo="Limite de aulas atingido",
-        mensagem="Você atingiu o limite de aulas do seu plano neste mês. Para liberar novas aulas, entre em contato com a administração da academia."
-    )
+            "mensagem.html",
+            titulo="Limite de aulas atingido",
+            mensagem="Você atingiu o limite de aulas do seu plano. Para liberar novas aulas, entre em contato com a administração da academia."
+        )
 
     if ocupadas >= aula["capacidade"]:
         conn.close()

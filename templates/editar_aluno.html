@@ -36,8 +36,14 @@
 <label>Data de nascimento:</label>
 <input type="date" name="data_nascimento" value="{{ aluno.data_nascimento }}">
 
-<label>Data de vencimento/fim:</label>
+<label>Data de início:</label>
+<input type="date" name="data_inicio" value="{{ aluno.data_inicio }}">
+
+<label>Data de vencimento:</label>
 <input type="date" name="vencimento" value="{{ aluno.vencimento }}" required>
+
+<label>Aulas já utilizadas antes do sistema:</label>
+<input type="number" name="aulas_usadas_iniciais" value="{{ aluno.aulas_usadas_iniciais or 0 }}">
 
 <label>Frequência:</label>
 <select name="frequencia">
