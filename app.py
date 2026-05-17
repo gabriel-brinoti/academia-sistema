@@ -366,28 +366,33 @@ def listar_aulas_do_dia(dia_semana=None):
         capacidade = aula["capacidade"] or 10
 
         cursor.execute("""
-            SELECT al.nome, al.data_nascimento
-            FROM agendamentos ag
-            JOIN alunos al ON al.id = ag.aluno_id
-            WHERE ag.aula_id = %s AND ag.data_agendamento = %s
-            ORDER BY al.nome ASC
-        """, (aula["id"], hoje))
-        inscritos_db = cursor.fetchall()
+    SELECT 
+        ag.id AS agendamento_id,
+        al.nome,
+        al.data_nascimento
+    FROM agendamentos ag
+    JOIN alunos al ON al.id = ag.aluno_id
+    WHERE ag.aula_id = %s AND ag.data_agendamento = %s
+    ORDER BY al.nome ASC
+    """, (aula["id"], hoje))
 
-        inscritos = [
-            {
-                "nome": i["nome"],
-                "idade": calcular_idade(i["data_nascimento"])
-            }
-            for i in inscritos_db
-        ]
+    inscritos_db = cursor.fetchall()
 
-        item = dict(aula)
-        item["restantes"] = max(capacidade - ocupadas, 0)
-        item["percentual"] = int((ocupadas / capacidade) * 100) if capacidade else 0
-        item["lotada"] = ocupadas >= capacidade
-        item["inscritos"] = inscritos
-        dados.append(item)
+    inscritos = [
+        {
+        "agendamento_id": i["agendamento_id"],
+        "nome": i["nome"],
+        "idade": calcular_idade(i["data_nascimento"])
+        }
+        for i in inscritos_db
+    ]
+
+    item = dict(aula)
+    item["restantes"] = max(capacidade - ocupadas, 0)
+    item["percentual"] = int((ocupadas / capacidade) * 100) if capacidade else 0
+    item["lotada"] = ocupadas >= capacidade
+    item["inscritos"] = inscritos
+    dados.append(item)
 
     conn.close()
     return dia_semana, dados
@@ -863,6 +868,22 @@ def aceitar_contrato():
     session.pop("aula_pendente_contrato", None)
 
     return render_template("agendamento_sucesso.html")
+
+@app.route("/remover_agendamento/<int:agendamento_id>")
+def remover_agendamento(agendamento_id):
+    if "admin_logado" not in session and "professor_liberado" not in session:
+        return redirect(url_for("cronograma"))
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM agendamentos WHERE id = %s", (agendamento_id,))
+
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for("cronograma"))
+
 init_db()
 
 if __name__ == "__main__":

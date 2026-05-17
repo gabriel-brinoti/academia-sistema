@@ -74,6 +74,10 @@
                                 {% if inscrito.idade is not none %}
                                     — {{ inscrito.idade }} anos
                                 {% endif %}
+                                <a href="{{ url_for('remover_agendamento', agendamento_id=inscrito.agendamento_id) }}"
+                                onclick="return confirm('Remover este aluno da aula?')">
+                                Remover
+                                </a>
                             </li>
                         {% endfor %}
                     </ul>
