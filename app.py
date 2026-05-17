@@ -806,9 +806,18 @@ def agendar_aula(aula_id):
     """, (aluno_id, aula_id, data_agendamento))
 
     conn.commit()
+    aulas_usadas_sistema = aulas_usadas_sistema + 1
+    aulas_usadas_total = aulas_usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
+    restantes = max(limite - aulas_usadas_total, 0)
     conn.close()
 
-    return render_template("agendamento_sucesso.html")
+    return render_template(
+    "agendamento_sucesso.html",
+    aulas_usadas=aulas_usadas_total,
+    aulas_total=limite,
+    aulas_restantes=restantes,
+    vencimento=aluno["vencimento"]
+)
 
 
 @app.route("/acesso_professor", methods=["POST"])
@@ -843,14 +852,14 @@ def aceitar_contrato():
     cursor = conn.cursor()
 
     cursor.execute("""
-    UPDATE alunos
-    SET aceitou_contrato = TRUE,
-        data_aceite_contrato = %s
-    WHERE id = %s
-""", (
-    (datetime.utcnow() - timedelta(hours=3)).strftime("%Y-%m-%d %H:%M:%S"),
-    aluno_id
-))
+        UPDATE alunos
+        SET aceitou_contrato = TRUE,
+            data_aceite_contrato = %s
+        WHERE id = %s
+    """, (
+        (datetime.utcnow() - timedelta(hours=3)).strftime("%Y-%m-%d %H:%M:%S"),
+        aluno_id
+    ))
 
     data_base = obter_data_base()
     data_agendamento = data_base.strftime("%Y-%m-%d")
@@ -862,12 +871,38 @@ def aceitar_contrato():
     """, (aluno_id, aula_id, data_agendamento))
 
     conn.commit()
+
+    cursor.execute("SELECT * FROM alunos WHERE id = %s", (aluno_id,))
+    aluno = cursor.fetchone()
+
+    cursor.execute("""
+        SELECT COUNT(*) AS total
+        FROM agendamentos
+        WHERE aluno_id = %s
+    """, (aluno_id,))
+
+    aulas_usadas_sistema = cursor.fetchone()["total"]
+
+    limite = limite_plano(aluno["plano"], aluno["aulas_contratadas"])
+    aulas_usadas_total = aulas_usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
+
+    if limite >= 9999:
+        restantes = 9999
+    else:
+        restantes = max(limite - aulas_usadas_total, 0)
+
     conn.close()
 
     session.pop("aluno_pendente_contrato", None)
     session.pop("aula_pendente_contrato", None)
 
-    return render_template("agendamento_sucesso.html")
+    return render_template(
+        "agendamento_sucesso.html",
+        aulas_usadas=aulas_usadas_total,
+        aulas_total=limite,
+        aulas_restantes=restantes,
+        vencimento=aluno["vencimento"]
+    )
 
 @app.route("/remover_agendamento/<int:agendamento_id>")
 def remover_agendamento(agendamento_id):
