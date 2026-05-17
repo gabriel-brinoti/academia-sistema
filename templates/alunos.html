@@ -49,7 +49,7 @@
             <td>{{ aluno.telefone }}</td>
             <td>{{ aluno.plano }}</td>
             <td>{{ aluno.resumo_aulas }}</td>
-            <td>{{ aluno.vencimento }}</td>
+            <td>{{ aluno.vencimento[8:10] }}/{{ aluno.vencimento[5:7] }}/{{ aluno.vencimento[0:4] }}</td>
             <td class="{{ aluno.status_pagamento|lower }}">{{ aluno.status_pagamento }}</td>
             <td>
                 <a class="btn" href="{{ url_for('editar_aluno', id=aluno.id) }}">Editar</a>
