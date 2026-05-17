@@ -12,6 +12,11 @@
         <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
         <h1>DL Fit</h1>
     </div>
+    {% if session.get("admin_logado") %}
+    <a href="{{ url_for('dashboard') }}" class="btn">
+        Voltar ao Painel Admin
+    </a>
+    {% endif %}
 
     <div class="professor-navbar">
         {% if session.get("admin_logado") or session.get("professor_liberado") %}
