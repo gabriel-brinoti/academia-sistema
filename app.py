@@ -304,7 +304,7 @@ def obter_data_base():
 
     # domingo = 6 
     if   agora.weekday() == 6:
-        if agora.hour >= 18:
+        if agora.hour >= 12:
             return agora.date() + timedelta(days=1)
 
     else:
