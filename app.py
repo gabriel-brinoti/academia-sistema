@@ -366,33 +366,33 @@ def listar_aulas_do_dia(dia_semana=None):
         capacidade = aula["capacidade"] or 10
 
         cursor.execute("""
-    SELECT 
-        ag.id AS agendamento_id,
-        al.nome,
-        al.data_nascimento
-    FROM agendamentos ag
-    JOIN alunos al ON al.id = ag.aluno_id
-    WHERE ag.aula_id = %s AND ag.data_agendamento = %s
-    ORDER BY al.nome ASC
-    """, (aula["id"], hoje))
+            SELECT 
+                ag.id AS agendamento_id,
+                al.nome,
+                al.data_nascimento
+            FROM agendamentos ag
+            JOIN alunos al ON al.id = ag.aluno_id
+            WHERE ag.aula_id = %s AND ag.data_agendamento = %s
+            ORDER BY al.nome ASC
+        """, (aula["id"], hoje))
 
-    inscritos_db = cursor.fetchall()
+        inscritos_db = cursor.fetchall()
 
-    inscritos = [
-        {
-        "agendamento_id": i["agendamento_id"],
-        "nome": i["nome"],
-        "idade": calcular_idade(i["data_nascimento"])
-        }
-        for i in inscritos_db
-    ]
+        inscritos = [
+            {
+                "agendamento_id": i["agendamento_id"],
+                "nome": i["nome"],
+                "idade": calcular_idade(i["data_nascimento"])
+            }
+            for i in inscritos_db
+        ]
 
-    item = dict(aula)
-    item["restantes"] = max(capacidade - ocupadas, 0)
-    item["percentual"] = int((ocupadas / capacidade) * 100) if capacidade else 0
-    item["lotada"] = ocupadas >= capacidade
-    item["inscritos"] = inscritos
-    dados.append(item)
+        item = dict(aula)
+        item["restantes"] = max(capacidade - ocupadas, 0)
+        item["percentual"] = int((ocupadas / capacidade) * 100) if capacidade else 0
+        item["lotada"] = ocupadas >= capacidade
+        item["inscritos"] = inscritos
+        dados.append(item)
 
     conn.close()
     return dia_semana, dados
