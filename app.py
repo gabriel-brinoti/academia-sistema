@@ -99,6 +99,110 @@ def limite_diario_aluno(aluno):
     return None
 
 
+def montar_aulas_padrao():
+    aulas = []
+
+    def adicionar_musculacao(dia, horas):
+        for hora in horas:
+            aulas.append((dia, f"{hora:02d}:00", "MUSCULACAO", 10))
+
+    horas_seg_quinta = [5, 6, 7, 8, 9, 10, 15, 16, 17, 18, 19, 20]
+    horas_sexta = [5, 6, 7, 8, 9, 10, 15, 16, 17, 18, 19]
+
+    for dia in ["Segunda-feira", "Terca-feira", "Quarta-feira", "Quinta-feira"]:
+        adicionar_musculacao(dia, horas_seg_quinta)
+    adicionar_musculacao("Sexta-feira", horas_sexta)
+
+    aulas.extend([
+        ("Segunda-feira", "07:00", "NEOPILATES", 7),
+        ("Segunda-feira", "08:00", "ACROYOGA", 7),
+        ("Segunda-feira", "09:00", "NEOPILATES", 7),
+        ("Segunda-feira", "16:00", "NEOPILATES", 7),
+        ("Segunda-feira", "17:00", "ACROYOGA", 7),
+        ("Segunda-feira", "18:00", "NEOPILATES", 7),
+        ("Segunda-feira", "18:00", "SPIN FIT", 7),
+        ("Segunda-feira", "19:00", "CIRCO", 7),
+        ("Segunda-feira", "19:00", "LEG WORK", 7),
+        ("Segunda-feira", "20:00", "ACROYOGA", 7),
+
+        ("Terca-feira", "05:00", "NEOPILATES", 7),
+        ("Terca-feira", "07:00", "CIRCO", 7),
+        ("Terca-feira", "07:00", "SPIN FIT", 7),
+        ("Terca-feira", "09:00", "NEOKIDS", 7),
+        ("Terca-feira", "16:00", "NEOKIDS", 7),
+        ("Terca-feira", "18:00", "STEP DANCE", 7),
+        ("Terca-feira", "18:00", "CIRCO", 7),
+        ("Terca-feira", "19:00", "FIT DANCE", 7),
+        ("Terca-feira", "19:00", "C.FIGHT", 7),
+
+        ("Quarta-feira", "07:00", "NEOPILATES", 7),
+        ("Quarta-feira", "08:00", "ACROYOGA", 7),
+        ("Quarta-feira", "16:00", "NEOPILATES", 7),
+        ("Quarta-feira", "17:00", "ACROYOGA", 7),
+        ("Quarta-feira", "18:00", "NEOPILATES", 7),
+        ("Quarta-feira", "18:00", "SPIN FIT", 7),
+        ("Quarta-feira", "19:00", "CIRCO", 7),
+        ("Quarta-feira", "19:00", "UP WORK", 7),
+        ("Quarta-feira", "20:00", "ACROYOGA", 7),
+
+        ("Quinta-feira", "05:00", "NEOPILATES", 7),
+        ("Quinta-feira", "07:00", "CIRCO", 7),
+        ("Quinta-feira", "07:00", "SPIN FIT", 7),
+        ("Quinta-feira", "09:00", "NEOKIDS", 7),
+        ("Quinta-feira", "16:00", "NEOKIDS", 7),
+        ("Quinta-feira", "18:00", "STEP DANCE", 7),
+        ("Quinta-feira", "18:00", "CIRCO", 7),
+        ("Quinta-feira", "19:00", "FIT DANCE", 7),
+        ("Quinta-feira", "19:00", "C.FIGHT", 7),
+
+        ("Sexta-feira", "05:00", "LEG WORK", 7),
+        ("Sexta-feira", "07:00", "FLEX FIT", 7),
+        ("Sexta-feira", "08:00", "ACROYOGA", 7),
+        ("Sexta-feira", "17:00", "CROSS FIGHT", 7),
+        ("Sexta-feira", "18:00", "SPIN FIT", 7),
+    ])
+
+    return aulas
+
+
+def sincronizar_aulas_padrao(cursor):
+    aulas_padrao = montar_aulas_padrao()
+    chaves_padrao = {(dia, horario, modalidade) for dia, horario, modalidade, _ in aulas_padrao}
+
+    for dia, horario, modalidade, capacidade in aulas_padrao:
+        cursor.execute("""
+            SELECT id
+            FROM aulas
+            WHERE dia_semana = %s AND horario = %s AND modalidade = %s
+            ORDER BY id
+            LIMIT 1
+        """, (dia, horario, modalidade))
+        aula = cursor.fetchone()
+
+        if aula:
+            cursor.execute("""
+                UPDATE aulas
+                SET capacidade = %s
+                WHERE id = %s
+            """, (capacidade, aula["id"]))
+        else:
+            cursor.execute("""
+                INSERT INTO aulas (dia_semana, horario, modalidade, capacidade)
+                VALUES (%s, %s, %s, %s)
+            """, (dia, horario, modalidade, capacidade))
+
+    cursor.execute("SELECT id, dia_semana, horario, modalidade FROM aulas")
+    for aula in cursor.fetchall():
+        chave = (aula["dia_semana"], aula["horario"], aula["modalidade"])
+        if chave in chaves_padrao:
+            continue
+
+        cursor.execute("""
+            DELETE FROM aulas
+            WHERE id = %s
+        """, (aula["id"],))
+
+
 def init_db():
     conn = conectar()
     cursor = conn.cursor()
@@ -179,119 +283,8 @@ def init_db():
 
     conn.commit()
 
-    cursor.execute("SELECT COUNT(*) AS total FROM aulas")
-    total_aulas = cursor.fetchone()["total"]
-
-    if total_aulas == 0:
-        aulas_padrao = [
-            ("Segunda-feira", "05:00", "MUSCULAÇÃO", 10),
-            ("Segunda-feira", "06:00", "MUSCULAÇÃO", 10),
-            ("Segunda-feira", "07:00", "MUSCULAÇÃO", 10),
-            ("Segunda-feira", "07:00", "NEOPILATES", 7),
-            ("Segunda-feira", "08:00", "MUSCULAÇÃO", 10),
-            ("Segunda-feira", "08:00", "ACROYOGA", 7),
-            ("Segunda-feira", "09:00", "MUSCULAÇÃO", 10),
-            ("Segunda-feira", "09:00", "NEOPILATES", 7),
-            ("Segunda-feira", "10:00", "MUSCULAÇÃO", 10),
-            ("Segunda-feira", "15:00", "MUSCULAÇÃO", 10),
-            ("Segunda-feira", "16:00", "MUSCULAÇÃO", 10),
-            ("Segunda-feira", "16:00", "NEOPILATES", 7),
-            ("Segunda-feira", "17:00", "MUSCULAÇÃO", 10),
-            ("Segunda-feira", "17:00", "ACROYOGA", 7),
-            ("Segunda-feira", "18:00", "MUSCULAÇÃO", 10),
-            ("Segunda-feira", "18:00", "DANCE FIT", 7),
-            ("Segunda-feira", "18:00", "C.FIGHT", 7),
-            ("Segunda-feira", "19:00", "MUSCULAÇÃO", 10),
-            ("Segunda-feira", "19:00", "CIRCO", 7),
-            ("Segunda-feira", "19:00", "STEP DANCE", 7),
-            ("Segunda-feira", "20:00", "MUSCULAÇÃO", 10),
-            ("Segunda-feira", "20:00", "ACROYOGA", 7),
-            ("Terca-feira", "05:00", "NEOPILATES", 7),
-            ("Terca-feira", "06:00", "MUSCULAÇÃO", 10),
-            ("Terca-feira", "07:00", "MUSCULAÇÃO", 10),
-            ("Terca-feira", "07:00", "CIRCO", 7),
-            ("Terca-feira", "07:00", "SPIN FIT", 7),
-            ("Terca-feira", "08:00", "MUSCULAÇÃO", 10),
-            ("Terca-feira", "08:00", "LEG WORK", 7),
-            ("Terca-feira", "09:00", "MUSCULAÇÃO", 10),
-            ("Terca-feira", "09:00", "NEOKIDS", 7),
-            ("Terca-feira", "10:00", "MUSCULAÇÃO", 10),
-            ("Terca-feira", "15:00", "MUSCULAÇÃO", 10),
-            ("Terca-feira", "16:00", "MUSCULAÇÃO", 10),
-            ("Terca-feira", "16:00", "NEOKIDS", 7),
-            ("Terca-feira", "17:00", "MUSCULAÇÃO", 10),
-            ("Terca-feira", "18:00", "MUSCULAÇÃO", 10),
-            ("Terca-feira", "18:00", "NEOPILATES", 7),
-            ("Terca-feira", "18:00", "SPIN FIT", 7),
-            ("Terca-feira", "19:00", "MUSCULAÇÃO", 10),
-            ("Terca-feira", "19:00", "CIRCO", 7),
-            ("Terca-feira", "20:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "05:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "06:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "07:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "07:00", "NEOPILATES", 7),
-            ("Quarta-feira", "08:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "08:00", "ACROYOGA", 7),
-            ("Quarta-feira", "09:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "09:00", "CROSS FIGHT", 7),
-            ("Quarta-feira", "10:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "15:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "16:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "16:00", "NEOPILATES", 7),
-            ("Quarta-feira", "17:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "17:00", "ACROYOGA", 7),
-            ("Quarta-feira", "18:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "18:00", "DANCE FIT", 7),
-            ("Quarta-feira", "18:00", "C.FIGHT", 7),
-            ("Quarta-feira", "19:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "19:00", "STEP DANCE", 7),
-            ("Quarta-feira", "19:00", "CIRCO", 7),
-            ("Quarta-feira", "20:00", "MUSCULAÇÃO", 10),
-            ("Quarta-feira", "20:00", "ACROYOGA", 7),
-            ("Quinta-feira", "05:00", "NEOPILATES", 7),
-            ("Quinta-feira", "06:00", "MUSCULAÇÃO", 10),
-            ("Quinta-feira", "07:00", "CIRCO", 7),
-            ("Quinta-feira", "07:00", "SPIN FIT", 7),
-            ("Quinta-feira", "07:00", "MUSCULAÇÃO", 10),
-            ("Quinta-feira", "08:00", "LEG WORK", 7),
-            ("Quinta-feira", "08:00", "MUSCULAÇÃO", 10),
-            ("Quinta-feira", "09:00", "NEOKIDS", 7),
-            ("Quinta-feira", "09:00", "MUSCULAÇÃO", 10),
-            ("Quinta-feira", "10:00", "MUSCULAÇÃO", 10),
-            ("Quinta-feira", "15:00", "MUSCULAÇÃO", 10),
-            ("Quinta-feira", "16:00", "NEOKIDS", 7),
-            ("Quinta-feira", "16:00", "MUSCULAÇÃO", 10),
-            ("Quinta-feira", "17:00", "MUSCULAÇÃO", 10),
-            ("Quinta-feira", "18:00", "NEOPILATES", 7),
-            ("Quinta-feira", "18:00", "SPIN FIT", 7),
-            ("Quinta-feira", "18:00", "MUSCULAÇÃO", 10),
-            ("Quinta-feira", "19:00", "CIRCO", 7),
-            ("Quinta-feira", "19:00", "LEG WORK", 7),
-            ("Quinta-feira", "19:00", "MUSCULAÇÃO", 10),
-            ("Quinta-feira", "20:00", "MUSCULAÇÃO", 10),
-            ("Sexta-feira", "05:00", "MUSCULAÇÃO", 10),
-            ("Sexta-feira", "06:00", "MUSCULAÇÃO", 10),
-            ("Sexta-feira", "07:00", "FLEX FIT", 7),
-            ("Sexta-feira", "07:00", "MUSCULAÇÃO", 10),
-            ("Sexta-feira", "08:00", "ACROYOGA", 10),
-            ("Sexta-feira", "08:00", "MUSCULAÇÃO", 10),
-            ("Sexta-feira", "09:00", "MUSCULAÇÃO", 10),
-            ("Sexta-feira", "10:00", "MUSCULAÇÃO", 10),
-            ("Sexta-feira", "15:00", "MUSCULAÇÃO", 10),
-            ("Sexta-feira", "16:00", "MUSCULAÇÃO", 10),
-            ("Sexta-feira", "17:00", "MUSCULAÇÃO", 10),
-            ("Sexta-feira", "17:00", "CROSS FIGHT", 7),
-            ("Sexta-feira", "18:00", "MUSCULAÇÃO", 10),
-            ("Sexta-feira", "18:00", "SPIN FIT", 7),
-            ("Sexta-feira", "19:00", "MUSCULAÇÃO", 10),
-        ]
-
-        cursor.executemany("""
-            INSERT INTO aulas (dia_semana, horario, modalidade, capacidade)
-            VALUES (%s, %s, %s, %s)
-        """, aulas_padrao)
-
-        conn.commit()
+    sincronizar_aulas_padrao(cursor)
+    conn.commit()
 
     conn.close()
 

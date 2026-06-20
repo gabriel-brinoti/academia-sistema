@@ -28,7 +28,16 @@
 <input type="text" name="telefone" value="{{ aluno.telefone }}">
 
 <label>Tipo de plano:</label>
-<input type="text" name="plano" value="{{ aluno.plano }}" required>
+<select name="plano" required>
+    <option value="LIGHT" {% if aluno.plano == 'LIGHT' %}selected{% endif %}>LIGHT</option>
+    <option value="BASICO" {% if aluno.plano == 'BASICO' %}selected{% endif %}>BASICO</option>
+    <option value="CLUBE" {% if aluno.plano == 'CLUBE' %}selected{% endif %}>CLUBE</option>
+    <option value="MENSAL" {% if aluno.plano == 'MENSAL' %}selected{% endif %}>MENSAL</option>
+    <option value="TRIMESTRAL" {% if aluno.plano == 'TRIMESTRAL' %}selected{% endif %}>TRIMESTRAL</option>
+    <option value="SEMESTRAL" {% if aluno.plano == 'SEMESTRAL' %}selected{% endif %}>SEMESTRAL</option>
+    <option value="LIVRE" {% if aluno.plano == 'LIVRE' %}selected{% endif %}>LIVRE</option>
+    <option value="GYMPASS" {% if aluno.plano == 'GYMPASS' %}selected{% endif %}>GYMPASS</option>
+</select>
 
 <label>Quantidade total de aulas:</label>
 <input type="number" name="aulas_contratadas" value="{{ aluno.aulas_contratadas or '' }}">
@@ -47,27 +56,27 @@
 
 <label>Frequência:</label>
 <select name="frequencia">
-    <option value="">Selecione</option>
+    <option value="">SELECIONE</option>
 
-    <option value="1x_semana" {% if aluno.frequencia == '1x_semana' %}selected{% endif %}>1x por semana</option>
+    <option value="1x_semana" {% if aluno.frequencia == '1x_semana' %}selected{% endif %}>1X POR SEMANA</option>
 
-    <option value="2x_semana" {% if aluno.frequencia == '2x_semana' %}selected{% endif %}>2x por semana</option>
+    <option value="2x_semana" {% if aluno.frequencia == '2x_semana' %}selected{% endif %}>2X POR SEMANA</option>
 
-    <option value="3x_semana" {% if aluno.frequencia == '3x_semana' %}selected{% endif %}>3x por semana</option>
+    <option value="3x_semana" {% if aluno.frequencia == '3x_semana' %}selected{% endif %}>3X POR SEMANA</option>
 
-    <option value="4x_semana" {% if aluno.frequencia == '4x_semana' %}selected{% endif %}>4x por semana</option>
+    <option value="4x_semana" {% if aluno.frequencia == '4x_semana' %}selected{% endif %}>4X POR SEMANA</option>
 
-    <option value="5x_semana" {% if aluno.frequencia == '5x_semana' %}selected{% endif %}>5x por semana</option>
+    <option value="5x_semana" {% if aluno.frequencia == '5x_semana' %}selected{% endif %}>5X POR SEMANA</option>
 
-    <option value="1x_dia" {% if aluno.frequencia == '1x_dia' %}selected{% endif %}>1x por dia</option>
+    <option value="1x_dia" {% if aluno.frequencia == '1x_dia' %}selected{% endif %}>1X POR DIA</option>
 
-    <option value="2x_dia" {% if aluno.frequencia == '2x_dia' %}selected{% endif %}>2x por dia</option>
+    <option value="2x_dia" {% if aluno.frequencia == '2x_dia' %}selected{% endif %}>2X POR DIA</option>
 </select>
         <label>Status do pagamento</label>
         <select name="status_pagamento" required>
-            <option value="Pago" {% if aluno.status_pagamento == 'Pago' %}selected{% endif %}>Pago</option>
-            <option value="Pendente" {% if aluno.status_pagamento == 'Pendente' %}selected{% endif %}>Pendente</option>
-            <option value="Atrasado" {% if aluno.status_pagamento == 'Atrasado' %}selected{% endif %}>Atrasado</option>
+            <option value="Pago" {% if aluno.status_pagamento == 'Pago' %}selected{% endif %}>PAGO</option>
+            <option value="Pendente" {% if aluno.status_pagamento == 'Pendente' %}selected{% endif %}>PENDENTE</option>
+            <option value="Atrasado" {% if aluno.status_pagamento == 'Atrasado' %}selected{% endif %}>ATRASADO</option>
         </select>
         <textarea name="observacao" placeholder="Observações">{{ aluno.observacao }}</textarea>
         <button type="submit">Atualizar</button>

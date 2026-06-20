@@ -22,20 +22,20 @@
     <p class="subtitulo">Cadastro completo de aluno</p>
     <form method="POST">
         <input type="text" name="nome" placeholder="Nome do aluno" required>
-        <input type="text" name="telefone" placeholder="Telefone" required>
+        <input type="text" name="telefone" placeholder="Telefone">
         <label>Plano:</label>
         <select name="plano">
-            <option value="LIGHT">light</option>
-            <option value="BASICO">básico</option>
-            <option value="CLUBE">clube</option>
-            <option value="MENSAL">mensal</option>
-            <option value="TRIMESTRAL">trimestral</option>
-            <option value="SEMESTRAL">semestral</option>
-            <option value="LIVRE">livre</option>
-            <option value="GYMPASS">gympass</option>
+            <option value="LIGHT">LIGHT</option>
+            <option value="BASICO">BASICO</option>
+            <option value="CLUBE">CLUBE</option>
+            <option value="MENSAL">MENSAL</option>
+            <option value="TRIMESTRAL">TRIMESTRAL</option>
+            <option value="SEMESTRAL">SEMESTRAL</option>
+            <option value="LIVRE">LIVRE</option>
+            <option value="GYMPASS">GYMPASS</option>
         </select>
         <label>Data de nascimento:</label>
-        <input type="date" name="data_nascimento" required>
+        <input type="date" name="data_nascimento">
         <label>Data de início:</label>
         <input type="date" name="data_inicio">
         <label>Quantidade total de aulas:</label>
@@ -44,22 +44,22 @@
         <input type="date" name="vencimento" required>
         <label>Frequência:</label>
         <select name="frequencia">
-        <option value="">Selecione</option>
-        <option value="1x_semana">1x por semana</option>
-        <option value="2x_semana">2x por semana</option>
-        <option value="3x_semana">3x por semana</option>
-        <option value="4x_semana">4x por semana</option>
-        <option value="5x_semana">5x por semana</option>
-        <option value="1x_dia">1x por dia</option>
-        <option value="2x_dia">2x por dia</option>
+        <option value="">SELECIONE</option>
+        <option value="1x_semana">1X POR SEMANA</option>
+        <option value="2x_semana">2X POR SEMANA</option>
+        <option value="3x_semana">3X POR SEMANA</option>
+        <option value="4x_semana">4X POR SEMANA</option>
+        <option value="5x_semana">5X POR SEMANA</option>
+        <option value="1x_dia">1X POR DIA</option>
+        <option value="2x_dia">2X POR DIA</option>
         </select>
         <label>Aulas já utilizadas antes do sistema:</label>
         <input type="number" name="aulas_usadas_iniciais" value="0" placeholder="Ex: 144">
         <label>Status do pagamento:</label>
         <select name="status_pagamento" required>
-            <option value="Pago">Pago</option>
-            <option value="Pendente">Pendente</option>
-            <option value="Atrasado">Atrasado</option>
+            <option value="Pago">PAGO</option>
+            <option value="Pendente">PENDENTE</option>
+            <option value="Atrasado">ATRASADO</option>
         </select>
         <textarea name="observacao" placeholder="Observações"></textarea>
         <button type="submit">Salvar Aluno</button>
