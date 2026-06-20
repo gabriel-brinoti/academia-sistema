@@ -248,6 +248,49 @@ tr:hover td {
     margin-bottom: 10px;
 }
 
+.admin-panel {
+    border: 1px solid #ececec;
+    border-radius: 12px;
+    padding: 18px;
+    margin: 24px 0;
+    background: #fcfcfc;
+}
+
+.admin-panel h3 {
+    margin-bottom: 14px;
+}
+
+.inline-form {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(140px, 1fr));
+    gap: 10px;
+    align-items: end;
+}
+
+.inline-form label {
+    font-weight: bold;
+    margin-bottom: -6px;
+}
+
+.bloqueios-lista {
+    margin-top: 14px;
+}
+
+.bloqueio-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid #ededed;
+}
+
+.aula-bloqueada {
+    color: #d62828;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
 .pago { color: #1f9d55; font-weight: bold; }
 .pendente { color: #d48b00; font-weight: bold; }
 .atrasado { color: #d62828; font-weight: bold; }
@@ -277,6 +320,15 @@ tr:hover td {
     .navbar {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .inline-form {
+        grid-template-columns: 1fr;
+    }
+
+    .bloqueio-item {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }
 

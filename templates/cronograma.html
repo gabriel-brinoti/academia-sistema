@@ -47,7 +47,12 @@
                 {{ aula.ocupadas }} / {{ aula.capacidade }} vagas ocupadas — Restam {{ aula.restantes }}
             </div>
 
-            {% if aula.lotada %}
+            {% if aula.bloqueada %}
+                <div class="aula-bloqueada">
+                    Bloqueada por fechamento especial a partir de {{ aula.horario_bloqueio }}
+                </div>
+                <button class="btn-danger" disabled>Bloqueada</button>
+            {% elif aula.lotada %}
                 <button class="btn-danger" disabled>Lotado</button>
             {% else %}
                 <form method="POST" action="{{ url_for('agendar_aula', aula_id=aula.id) }}">

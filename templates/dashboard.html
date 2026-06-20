@@ -43,12 +43,47 @@
         <div class="card"><p>Atrasados</p><h2>{{ atrasados }}</h2></div>
     </div>
 
+    <div class="admin-panel">
+        <h3>Bloquear aulas por fechamento especial</h3>
+        <form method="POST" action="{{ url_for('bloqueio_aulas') }}" class="inline-form">
+            <label>Data</label>
+            <input type="date" name="data_bloqueio" value="{{ data_padrao_bloqueio }}" required>
+
+            <label>Bloquear a partir de</label>
+            <input type="time" name="horario_inicio" required>
+
+            <label>Motivo</label>
+            <input type="text" name="motivo" placeholder="Ex: jogo da Copa">
+
+            <button type="submit">Bloquear aulas</button>
+        </form>
+
+        {% if bloqueios_aulas %}
+        <div class="bloqueios-lista">
+            {% for bloqueio in bloqueios_aulas %}
+            <div class="bloqueio-item">
+                <span>{{ bloqueio.data_bloqueio[8:10] }}/{{ bloqueio.data_bloqueio[5:7] }}/{{ bloqueio.data_bloqueio[0:4] }} a partir de {{ bloqueio.horario_inicio }}</span>
+                {% if bloqueio.motivo %}
+                    <span>{{ bloqueio.motivo }}</span>
+                {% endif %}
+                <form method="POST" action="{{ url_for('remover_bloqueio_aulas', data_bloqueio=bloqueio.data_bloqueio) }}">
+                    <button type="submit" class="btn-danger">Remover</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
     <h2 class="schedule-title">Cronograma do Dia</h2>
     {% for aula in aulas_hoje %}
     <div class="aula-card">
         <div class="aula-linha">{{ aula.horario }} - {{ aula.modalidade }}</div>
         <div class="progress"><div class="progress-bar" style="width: {{ aula.percentual }}%;"></div></div>
         <div class="aula-info">{{ aula.ocupadas }} / {{ aula.capacidade }} vagas ocupadas — Restam {{ aula.restantes }}</div>
+        {% if aula.bloqueada %}
+            <div class="aula-bloqueada">Bloqueada por fechamento especial a partir de {{ aula.horario_bloqueio }}</div>
+        {% endif %}
     </div>
     {% endfor %}
 </div>
