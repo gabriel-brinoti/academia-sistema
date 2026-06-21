@@ -10,17 +10,24 @@
 <div class="navbar">
     <div class="navbar-brand">
         <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
-        <h1>DL Fit</h1>
+        <h1>{% if modo_professor %}Painel do Professor{% else %}DL Fit{% endif %}</h1>
     </div>
     {% if session.get("admin_logado") %}
     <a href="{{ url_for('dashboard') }}" class="btn">
         Voltar ao Painel Admin
     </a>
+    {% if not modo_professor %}
+    <a href="{{ url_for('painel_professor') }}" class="btn">
+        Painel do Professor
+    </a>
+    {% endif %}
     {% endif %}
 
     <div class="professor-navbar">
         {% if session.get("professor_liberado") %}
             <a href="{{ url_for('sair_professor') }}" class="btn">Sair do modo professor</a>
+        {% elif modo_professor %}
+            <a href="{{ url_for('cronograma') }}" class="btn">Ver cronograma dos alunos</a>
         {% elif not session.get("admin_logado") %}
             <form method="POST" action="{{ url_for('acesso_professor') }}">
                 <input type="password" name="senha_professor" placeholder="Senha do professor" required>
@@ -31,7 +38,7 @@
 </div>
 
 <div class="container">
-    <h2 class="schedule-title">Cronograma do Dia</h2>
+    <h2 class="schedule-title">{% if modo_professor %}Painel do Professor{% else %}Cronograma do Dia{% endif %}</h2>
     <h2>{{ dia_atual }} - {{ data_cronograma }}</h2>
 
     {% if aulas_hoje %}
@@ -68,7 +75,7 @@
                 </form>
             {% endif %}
 
-            {% if session.get("professor_liberado") %}
+            {% if modo_professor %}
             <div class="lista-alunos-aula">
                 <h4>Alunos inscritos nesta aula</h4>
                 {% if aula.inscritos %}

@@ -760,7 +760,32 @@ def cronograma():
         dia_atual=dia_atual,
         data_cronograma=data_cronograma,
         aulas_hoje=aulas_hoje,
-        alunos=alunos
+        alunos=alunos,
+        modo_professor=False
+    )
+
+
+@app.route("/painel_professor")
+def painel_professor():
+    if "admin_logado" not in session and "professor_liberado" not in session:
+        return redirect(url_for("cronograma"))
+
+    dia_atual, aulas_hoje = listar_aulas_do_dia()
+    data_cronograma = obter_data_cronograma_formatada()
+
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
+    alunos = cursor.fetchall()
+    conn.close()
+
+    return render_template(
+        "cronograma.html",
+        dia_atual=dia_atual,
+        data_cronograma=data_cronograma,
+        aulas_hoje=aulas_hoje,
+        alunos=alunos,
+        modo_professor=True
     )
 
 
@@ -918,6 +943,7 @@ def acesso_professor():
     senha = request.form.get("senha_professor", "")
     if senha == "dlfit":
         session["professor_liberado"] = True
+        return redirect(url_for("painel_professor"))
     return redirect(url_for("cronograma"))
 
 
