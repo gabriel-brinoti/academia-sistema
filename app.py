@@ -575,7 +575,10 @@ def novo_aluno():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        nome = request.form["nome"]
+        nome = request.form.get("nome", "").strip()
+        if not nome:
+            return redirect(url_for("novo_aluno"))
+
         usuario = remover_acentos(nome.split()[0].lower())
 
         conn = conectar()
@@ -590,10 +593,10 @@ def novo_aluno():
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             nome,
-            request.form["telefone"],
-            request.form["plano"],
-            request.form["vencimento"],
-            request.form["status_pagamento"],
+            request.form.get("telefone", ""),
+            request.form.get("plano", ""),
+            request.form.get("vencimento", ""),
+            request.form.get("status_pagamento", ""),
             request.form.get("observacao", ""),
             12,
             usuario,
@@ -621,6 +624,11 @@ def editar_aluno(id):
     cursor = conn.cursor()
 
     if request.method == "POST":
+        nome = request.form.get("nome", "").strip()
+        if not nome:
+            conn.close()
+            return redirect(url_for("editar_aluno", id=id))
+
         cursor.execute("""
             UPDATE alunos
             SET nome=%s, telefone=%s, plano=%s, vencimento=%s,
@@ -629,11 +637,11 @@ def editar_aluno(id):
                 aulas_usadas_iniciais=%s
             WHERE id=%s
         """, (
-            request.form["nome"],
-            request.form["telefone"],
-            request.form["plano"],
-            request.form["vencimento"],
-            request.form["status_pagamento"],
+            nome,
+            request.form.get("telefone", ""),
+            request.form.get("plano", ""),
+            request.form.get("vencimento", ""),
+            request.form.get("status_pagamento", ""),
             request.form.get("observacao", ""),
             request.form.get("data_nascimento", ""),
             request.form.get("data_inicio", ""),

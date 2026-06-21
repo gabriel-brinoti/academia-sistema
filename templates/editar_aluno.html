@@ -28,7 +28,8 @@
 <input type="text" name="telefone" value="{{ aluno.telefone }}">
 
 <label>Tipo de plano:</label>
-<select name="plano" required>
+<select name="plano">
+    <option value="" {% if not aluno.plano %}selected{% endif %}>SELECIONE</option>
     <option value="LIGHT" {% if aluno.plano == 'LIGHT' %}selected{% endif %}>LIGHT</option>
     <option value="BASICO" {% if aluno.plano == 'BASICO' %}selected{% endif %}>BASICO</option>
     <option value="CLUBE" {% if aluno.plano == 'CLUBE' %}selected{% endif %}>CLUBE</option>
@@ -49,7 +50,7 @@
 <input type="date" name="data_inicio" value="{{ aluno.data_inicio }}">
 
 <label>Data de vencimento:</label>
-<input type="date" name="vencimento" value="{{ aluno.vencimento }}" required>
+<input type="date" name="vencimento" value="{{ aluno.vencimento }}">
 
 <label>Aulas já utilizadas antes do sistema:</label>
 <input type="number" name="aulas_usadas_iniciais" value="{{ aluno.aulas_usadas_iniciais or 0 }}">
@@ -73,7 +74,8 @@
     <option value="2x_dia" {% if aluno.frequencia == '2x_dia' %}selected{% endif %}>2X POR DIA</option>
 </select>
         <label>Status do pagamento</label>
-        <select name="status_pagamento" required>
+        <select name="status_pagamento">
+            <option value="" {% if not aluno.status_pagamento %}selected{% endif %}>SELECIONE</option>
             <option value="Pago" {% if aluno.status_pagamento == 'Pago' %}selected{% endif %}>PAGO</option>
             <option value="Pendente" {% if aluno.status_pagamento == 'Pendente' %}selected{% endif %}>PENDENTE</option>
             <option value="Atrasado" {% if aluno.status_pagamento == 'Atrasado' %}selected{% endif %}>ATRASADO</option>

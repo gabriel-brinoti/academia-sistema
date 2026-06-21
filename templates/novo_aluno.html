@@ -25,6 +25,7 @@
         <input type="text" name="telefone" placeholder="Telefone">
         <label>Plano:</label>
         <select name="plano">
+            <option value="">SELECIONE</option>
             <option value="LIGHT">LIGHT</option>
             <option value="BASICO">BASICO</option>
             <option value="CLUBE">CLUBE</option>
@@ -41,7 +42,7 @@
         <label>Quantidade total de aulas:</label>
         <input type="number" name="aulas_contratadas" placeholder="Ex: 4, 12 ou deixe vazio para padrão">
         <label>Data de vencimento:</label>
-        <input type="date" name="vencimento" required>
+        <input type="date" name="vencimento">
         <label>Frequência:</label>
         <select name="frequencia">
         <option value="">SELECIONE</option>
@@ -56,7 +57,8 @@
         <label>Aulas já utilizadas antes do sistema:</label>
         <input type="number" name="aulas_usadas_iniciais" value="0" placeholder="Ex: 144">
         <label>Status do pagamento:</label>
-        <select name="status_pagamento" required>
+        <select name="status_pagamento">
+            <option value="">SELECIONE</option>
             <option value="Pago">PAGO</option>
             <option value="Pendente">PENDENTE</option>
             <option value="Atrasado">ATRASADO</option>

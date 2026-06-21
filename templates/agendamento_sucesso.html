@@ -16,7 +16,9 @@
 
 <p>Restam {{ aulas_restantes }} aulas disponíveis.</p>
 
+{% if vencimento %}
 <p>Plano válido até {{ vencimento[8:10] }}/{{ vencimento[5:7] }}/{{ vencimento[0:4] }}.</p>
+{% endif %}
 
 {% if aulas_restantes <= 3 %}
     <p><strong>Atenção:</strong> restam poucas aulas disponíveis no seu plano.</p>
