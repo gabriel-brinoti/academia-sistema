@@ -796,7 +796,11 @@ def agendar_aula(aula_id):
     # 🚫 bloqueio por pagamento
     if aluno["status_pagamento"] == "Atrasado":
         conn.close()
-        return redirect(url_for("cronograma"))
+        return render_template(
+            "mensagem.html",
+            titulo="Aula nao marcada",
+            mensagem="Aula nao marcada porque o pagamento esta em atraso. Procure a administracao da academia para regularizar."
+        )
 
     data_base = obter_data_base()
     data_agendamento = data_base.strftime("%Y-%m-%d")
@@ -857,8 +861,8 @@ def agendar_aula(aula_id):
         conn.close()
         return render_template(
             "mensagem.html",
-            titulo="Limite de aulas atingido",
-            mensagem="Você atingiu o limite de aulas do seu plano. Para liberar novas aulas, entre em contato com a administração da academia."
+            titulo="Aula nao marcada",
+            mensagem="Aula nao marcada porque o aluno esta sem aulas restantes. Procure a administracao da academia para liberar novas aulas."
         )
 
     if ocupadas >= aula["capacidade"]:
