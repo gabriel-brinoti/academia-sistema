@@ -432,6 +432,7 @@ def login():
     if request.method == "POST":
         if request.form["usuario"] == "dlfit" and request.form["senha"] == "academia@2026":
             session["admin_logado"] = True
+            session.pop("professor_liberado", None)
             return redirect(url_for("dashboard"))
         erro = "Usuario ou senha invalidos"
     return render_template("login.html", erro=erro)
@@ -440,6 +441,7 @@ def login():
 @app.route("/logout")
 def logout():
     session.pop("admin_logado", None)
+    session.pop("professor_liberado", None)
     return redirect(url_for("login"))
 
 

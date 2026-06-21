@@ -19,9 +19,9 @@
     {% endif %}
 
     <div class="professor-navbar">
-        {% if session.get("admin_logado") or session.get("professor_liberado") %}
+        {% if session.get("professor_liberado") %}
             <a href="{{ url_for('sair_professor') }}" class="btn">Sair do modo professor</a>
-        {% else %}
+        {% elif not session.get("admin_logado") %}
             <form method="POST" action="{{ url_for('acesso_professor') }}">
                 <input type="password" name="senha_professor" placeholder="Senha do professor" required>
                 <button type="submit">Acesso do Professor</button>
