@@ -68,7 +68,7 @@
                 </form>
             {% endif %}
 
-            {% if session.get("admin_logado") or session.get("professor_liberado") %}
+            {% if session.get("professor_liberado") %}
             <div class="lista-alunos-aula">
                 <h4>Alunos inscritos nesta aula</h4>
                 {% if aula.inscritos %}
