@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Editar Aluno - DL Fit</title>
+    <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='logo-dlfit.jpg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -28,17 +29,16 @@
 <input type="text" name="telefone" value="{{ aluno.telefone }}">
 
 <label>Tipo de plano:</label>
-<select name="plano">
-    <option value="" {% if not aluno.plano %}selected{% endif %}>SELECIONE</option>
-    <option value="LIGHT" {% if aluno.plano == 'LIGHT' %}selected{% endif %}>LIGHT</option>
-    <option value="BASICO" {% if aluno.plano == 'BASICO' %}selected{% endif %}>BASICO</option>
-    <option value="CLUBE" {% if aluno.plano == 'CLUBE' %}selected{% endif %}>CLUBE</option>
-    <option value="MENSAL" {% if aluno.plano == 'MENSAL' %}selected{% endif %}>MENSAL</option>
-    <option value="TRIMESTRAL" {% if aluno.plano == 'TRIMESTRAL' %}selected{% endif %}>TRIMESTRAL</option>
-    <option value="SEMESTRAL" {% if aluno.plano == 'SEMESTRAL' %}selected{% endif %}>SEMESTRAL</option>
-    <option value="LIVRE" {% if aluno.plano == 'LIVRE' %}selected{% endif %}>LIVRE</option>
-    <option value="GYMPASS" {% if aluno.plano == 'GYMPASS' %}selected{% endif %}>GYMPASS</option>
-</select>
+<input type="text" name="plano" list="lista_planos" value="{{ aluno.plano or '' }}" placeholder="SELECIONE OU DIGITE">
+<datalist id="lista_planos">
+    <option value="MENSAL">
+    <option value="SEMESTRAL">
+    <option value="ANUAL">
+    <option value="CLUBE MAIS 12">
+    <option value="CLUBE MAIS 15">
+    <option value="WELLHUB">
+    <option value="TOTALPASS">
+</datalist>
 
 <label>Quantidade total de aulas:</label>
 <input type="number" name="aulas_contratadas" value="{{ aluno.aulas_contratadas or '' }}">

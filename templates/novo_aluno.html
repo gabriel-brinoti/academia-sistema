@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Novo Aluno - DL Fit</title>
+    <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='logo-dlfit.jpg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -24,17 +25,16 @@
         <input type="text" name="nome" placeholder="Nome do aluno" required>
         <input type="text" name="telefone" placeholder="Telefone">
         <label>Plano:</label>
-        <select name="plano">
-            <option value="">SELECIONE</option>
-            <option value="LIGHT">LIGHT</option>
-            <option value="BASICO">BASICO</option>
-            <option value="CLUBE">CLUBE</option>
-            <option value="MENSAL">MENSAL</option>
-            <option value="TRIMESTRAL">TRIMESTRAL</option>
-            <option value="SEMESTRAL">SEMESTRAL</option>
-            <option value="LIVRE">LIVRE</option>
-            <option value="GYMPASS">GYMPASS</option>
-        </select>
+        <input type="text" name="plano" list="lista_planos" placeholder="SELECIONE OU DIGITE">
+        <datalist id="lista_planos">
+            <option value="MENSAL">
+            <option value="SEMESTRAL">
+            <option value="ANUAL">
+            <option value="CLUBE MAIS 12">
+            <option value="CLUBE MAIS 15">
+            <option value="WELLHUB">
+            <option value="TOTALPASS">
+        </datalist>
         <label>Data de nascimento:</label>
         <input type="date" name="data_nascimento">
         <label>Data de início:</label>

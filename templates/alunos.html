@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Alunos - DL Fit</title>
+    <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='logo-dlfit.jpg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -24,8 +25,15 @@
     <p class="subtitulo">Listagem e busca de alunos</p>
     <form method="GET" class="busca-box">
         <input type="text" name="busca" placeholder="Buscar por nome..." value="{{ busca }}">
+        {% if status %}
+            <input type="hidden" name="status" value="{{ status }}">
+        {% endif %}
         <button type="submit">Buscar</button>
     </form>
+    {% if status %}
+        <p class="subtitulo">Filtro atual: {{ status }}</p>
+        <a class="btn" href="{{ url_for('alunos') }}">Ver todos</a>
+    {% endif %}
     <a class="btn btn-danger" href="{{ url_for('excluir_todos_alunos') }}"
    onclick="return confirm('Tem certeza que deseja excluir TODOS os alunos e agendamentos? Essa ação não pode ser desfeita.')">
    Excluir todos os alunos
@@ -49,7 +57,13 @@
             <td>{{ aluno.telefone }}</td>
             <td>{{ aluno.plano }}</td>
             <td>{{ aluno.resumo_aulas }}</td>
-            <td>{{ aluno.vencimento[8:10] }}/{{ aluno.vencimento[5:7] }}/{{ aluno.vencimento[0:4] }}</td>
+            <td>
+                {% if aluno.vencimento %}
+                    {{ aluno.vencimento[8:10] }}/{{ aluno.vencimento[5:7] }}/{{ aluno.vencimento[0:4] }}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
             <td class="{{ aluno.status_pagamento|lower }}">{{ aluno.status_pagamento }}</td>
             <td>
                 <a class="btn" href="{{ url_for('editar_aluno', id=aluno.id) }}">Editar</a>

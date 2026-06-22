@@ -538,11 +538,21 @@ def alunos():
         return redirect(url_for("login"))
 
     busca = request.args.get("busca", "").strip()
+    status = request.args.get("status", "").strip()
     conn = conectar()
     cursor = conn.cursor()
 
-    if busca:
+    if busca and status:
+        cursor.execute(
+            "SELECT * FROM alunos WHERE nome ILIKE %s AND status_pagamento = %s ORDER BY nome ASC",
+            (f"%{busca}%", status)
+        )
+        alunos = cursor.fetchall()
+    elif busca:
         cursor.execute("SELECT * FROM alunos WHERE nome ILIKE %s ORDER BY nome ASC", (f"%{busca}%",))
+        alunos = cursor.fetchall()
+    elif status:
+        cursor.execute("SELECT * FROM alunos WHERE status_pagamento = %s ORDER BY nome ASC", (status,))
         alunos = cursor.fetchall()
     else:
         cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
@@ -552,7 +562,13 @@ def alunos():
         aluno["resumo_aulas"] = resumo_aulas_mes(cursor, aluno["id"], aluno["plano"])
 
     conn.close()
-    return render_template("alunos.html", alunos=alunos, busca=busca, calcular_idade=calcular_idade)
+    return render_template(
+        "alunos.html",
+        alunos=alunos,
+        busca=busca,
+        status=status,
+        calcular_idade=calcular_idade
+    )
 
 
 @app.route("/excluir_todos_alunos")
@@ -596,7 +612,7 @@ def novo_aluno():
         """, (
             nome,
             request.form.get("telefone", ""),
-            request.form.get("plano", ""),
+            request.form.get("plano", "").upper().strip(),
             request.form.get("vencimento", ""),
             request.form.get("status_pagamento", ""),
             request.form.get("observacao", ""),
@@ -641,7 +657,7 @@ def editar_aluno(id):
         """, (
             nome,
             request.form.get("telefone", ""),
-            request.form.get("plano", ""),
+            request.form.get("plano", "").upper().strip(),
             request.form.get("vencimento", ""),
             request.form.get("status_pagamento", ""),
             request.form.get("observacao", ""),
