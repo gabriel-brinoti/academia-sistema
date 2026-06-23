@@ -45,8 +45,7 @@
     <h2 class="schedule-title">{% if modo_professor %}Painel do Professor{% else %}Cronograma do Dia{% endif %}</h2>
     <h2>{{ dia_atual }} - {{ data_cronograma }}</h2>
 
-    {% if aulas_hoje %}
-        {% for aula in aulas_hoje %}
+    {% macro aula_card(aula) %}
         <div class="aula-card">
             <div class="aula-linha">{{ aula.horario }} - {{ aula.modalidade }}</div>
 
@@ -55,7 +54,7 @@
             </div>
 
             <div class="aula-info">
-                {{ aula.ocupadas }} / {{ aula.capacidade }} vagas ocupadas — Restam {{ aula.restantes }}
+                {{ aula.ocupadas }} / {{ aula.capacidade }} vagas ocupadas - Restam {{ aula.restantes }}
             </div>
 
             {% if aula.bloqueada %}
@@ -88,7 +87,7 @@
                             <li>
                                 {{ inscrito.nome }}
                                 {% if inscrito.idade is not none %}
-                                    — {{ inscrito.idade }} anos
+                                    - {{ inscrito.idade }} anos
                                 {% endif %}
                                 <a href="{{ url_for('remover_agendamento', agendamento_id=inscrito.agendamento_id) }}"
                                 onclick="return confirm('Remover este aluno da aula?')">
@@ -98,15 +97,36 @@
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <p>Nenhum aluno inscrito até o momento.</p>
+                    <p>Nenhum aluno inscrito ate o momento.</p>
                 {% endif %}
             </div>
             {% endif %}
         </div>
-        {% endfor %}
+    {% endmacro %}
+
+    {% if aulas_hoje %}
+    <div class="schedule-columns">
+        <section class="schedule-column">
+            <h3 class="schedule-column-title">Musculacao</h3>
+            {% for aula in aulas_hoje if aula.modalidade == 'MUSCULACAO' %}
+                {{ aula_card(aula) }}
+            {% else %}
+                <div class="aula-card"><div class="aula-info">Nao ha horarios de musculacao para hoje.</div></div>
+            {% endfor %}
+        </section>
+
+        <section class="schedule-column">
+            <h3 class="schedule-column-title">Aulas</h3>
+            {% for aula in aulas_hoje if aula.modalidade != 'MUSCULACAO' %}
+                {{ aula_card(aula) }}
+            {% else %}
+                <div class="aula-card"><div class="aula-info">Nao ha aulas cadastradas para hoje.</div></div>
+            {% endfor %}
+        </section>
+    </div>
     {% else %}
         <div class="aula-card">
-            <div class="aula-info">Não há aulas cadastradas para hoje.</div>
+            <div class="aula-info">Nao ha aulas cadastradas para hoje.</div>
         </div>
     {% endif %}
 </div>
