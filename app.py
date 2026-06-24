@@ -83,22 +83,6 @@ def calcular_idade(data_nascimento):
     except Exception:
         return None
 
-def limite_diario_aluno(aluno):
-    frequencia = str(aluno.get("frequencia") or "").lower().strip()
-    plano = remover_acentos(str(aluno.get("plano") or "").upper().strip())
-
-    if plano == "GYMPASS":
-        return 1
-
-    if frequencia == "1x_dia":
-        return 1
-
-    if frequencia == "2x_dia" or plano == "LIVRE":
-        return 2
-
-    return None
-
-
 def montar_aulas_padrao():
     aulas = []
 
@@ -857,26 +841,6 @@ def agendar_aula(aula_id):
             mensagem="A academia tera fechamento especial neste dia. As aulas a partir deste horario nao estao disponiveis para agendamento."
         )
 
-    limite_diario = limite_diario_aluno(aluno)
-
-    if limite_diario:
-        cursor.execute("""
-            SELECT COUNT(*) AS total
-            FROM agendamentos
-            WHERE aluno_id = %s
-            AND data_agendamento = %s
-        """, (aluno_id, data_agendamento))
-
-        aulas_usadas_dia = cursor.fetchone()["total"]
-
-        if aulas_usadas_dia >= limite_diario:
-            conn.close()
-            return render_template(
-                "mensagem.html",
-                titulo="Limite diário atingido",
-                mensagem="Você atingiu o limite de aulas permitidas para hoje. Para mais informações, entre em contato com a administração da academia."
-            )
-
     # vagas ocupadas
     cursor.execute("""
         SELECT COUNT(*) AS total
@@ -884,10 +848,6 @@ def agendar_aula(aula_id):
         WHERE aula_id = %s AND data_agendamento = %s
     """, (aula_id, data_agendamento))
     ocupadas = cursor.fetchone()["total"]
-
-    # limite mensal
-    inicio_mes = data_base.replace(day=1).strftime("%Y-%m-%d")
-    hoje = data_base.strftime("%Y-%m-%d")
 
     cursor.execute("""
     SELECT COUNT(*) AS total
