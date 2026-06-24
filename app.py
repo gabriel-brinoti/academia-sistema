@@ -309,7 +309,7 @@ def obter_data_base():
             return agora.date() + timedelta(days=1)
 
     else:
-        if agora.hour >= 21:
+        if (agora.hour, agora.minute) >= (20, 45):
             return agora.date() + timedelta(days=1)
 
     return agora.date()
