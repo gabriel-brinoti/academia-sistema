@@ -45,6 +45,12 @@
     <h2 class="schedule-title">{% if modo_professor %}Painel do Professor{% else %}Cronograma do Dia{% endif %}</h2>
     <h2>{{ dia_atual }} - {{ data_cronograma }}</h2>
 
+    <datalist id="lista_alunos">
+        {% for aluno in alunos %}
+            <option value="{{ aluno.nome }}">
+        {% endfor %}
+    </datalist>
+
     {% macro aula_card(aula) %}
         <div class="aula-card">
             <div class="aula-linha">{{ aula.horario }} - {{ aula.modalidade }}</div>
@@ -66,19 +72,12 @@
                 <button class="btn-danger" disabled>Lotado</button>
             {% else %}
                 <form method="POST" action="{{ url_for('agendar_aula', aula_id=aula.id) }}">
-                    <input type="text" name="nome_aluno" list="lista_alunos" required>
-
-                    <datalist id="lista_alunos">
-                        {% for aluno in alunos %}
-                            <option value="{{ aluno.nome }}">
-                        {% endfor %}
-                    </datalist>
+                    <input type="text" name="nome_aluno" list="lista_alunos" autocomplete="off" required>
 
                     <button type="submit">Entrar na aula</button>
                 </form>
             {% endif %}
 
-            {% if modo_professor %}
             <div class="lista-alunos-aula">
                 <h4>Alunos inscritos nesta aula</h4>
                 {% if aula.inscritos %}
@@ -86,13 +85,15 @@
                         {% for inscrito in aula.inscritos %}
                             <li>
                                 {{ inscrito.nome }}
-                                {% if inscrito.idade is not none %}
+                                {% if modo_professor and inscrito.idade is not none %}
                                     - {{ inscrito.idade }} anos
                                 {% endif %}
+                                {% if modo_professor %}
                                 <a href="{{ url_for('remover_agendamento', agendamento_id=inscrito.agendamento_id) }}"
                                 onclick="return confirm('Remover este aluno da aula?')">
                                 Remover
                                 </a>
+                                {% endif %}
                             </li>
                         {% endfor %}
                     </ul>
@@ -100,7 +101,6 @@
                     <p>Nenhum aluno inscrito ate o momento.</p>
                 {% endif %}
             </div>
-            {% endif %}
         </div>
     {% endmacro %}
 

@@ -26,6 +26,11 @@ def conectar():
 def remover_acentos(texto):
     return unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('ASCII')
 
+
+def normalizar_nome(texto):
+    return remover_acentos(" ".join(str(texto or "").split())).casefold()
+
+
 def limite_plano(plano, aulas_contratadas=None):
     if aulas_contratadas:
         return int(aulas_contratadas)
@@ -791,22 +796,25 @@ def painel_professor():
 
 @app.route("/agendar_aula/<int:aula_id>", methods=["POST"])
 def agendar_aula(aula_id):
-    nome_digitado = request.form["nome_aluno"]
+    nome_digitado = request.form.get("nome_aluno", "")
 
     conn = conectar()
     cursor = conn.cursor()
 
-    # 🔍 buscar aluno pelo nome
-    cursor.execute("""
-    SELECT * FROM alunos
-    WHERE LOWER(nome) = LOWER(%s)
-""", (nome_digitado.strip(),))
-
-    aluno = cursor.fetchone()
+    cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
+    nome_normalizado = normalizar_nome(nome_digitado)
+    aluno = next(
+        (item for item in cursor.fetchall() if normalizar_nome(item["nome"]) == nome_normalizado),
+        None
+    )
 
     if not aluno:
         conn.close()
-        return redirect(url_for("cronograma"))
+        return render_template(
+            "mensagem.html",
+            titulo="Aluno nao encontrado",
+            mensagem="Nao encontramos esse nome no cadastro. Digite o nome completo ou selecione o nome na lista."
+        )
 
     aluno_id = aluno["id"]
 
