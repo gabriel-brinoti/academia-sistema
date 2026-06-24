@@ -305,8 +305,27 @@ from datetime import datetime, timedelta
 
 from datetime import datetime, timedelta
 
+
+def obter_horario_bloqueio(data_bloqueio):
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT horario_inicio
+        FROM bloqueios_aulas
+        WHERE data_bloqueio = %s
+    """, (data_bloqueio.strftime("%Y-%m-%d"),))
+    bloqueio = cursor.fetchone()
+    conn.close()
+
+    return bloqueio["horario_inicio"] if bloqueio else None
+
+
 def obter_data_base():
     agora = datetime.utcnow() - timedelta(hours=3)
+    horario_bloqueio = obter_horario_bloqueio(agora.date())
+
+    if horario_bloqueio and agora.strftime("%H:%M") >= horario_bloqueio:
+        return agora.date() + timedelta(days=1)
 
     # domingo = 6 
     if   agora.weekday() == 6:
@@ -837,6 +856,16 @@ def agendar_aula(aula_id):
             mensagem="Aula nao marcada porque o pagamento esta em atraso. Procure a administracao da academia para regularizar."
         )
 
+    agora = datetime.utcnow() - timedelta(hours=3)
+    bloqueio_hoje = obter_bloqueio_aulas(cursor, agora.strftime("%Y-%m-%d"))
+    if bloqueio_hoje and agora.strftime("%H:%M") >= bloqueio_hoje["horario_inicio"]:
+        conn.close()
+        return render_template(
+            "mensagem.html",
+            titulo="Cronograma atualizado",
+            mensagem="O horario de fechamento especial foi atingido. Volte ao cronograma para ver as aulas do dia seguinte."
+        )
+
     data_base = obter_data_base()
     data_agendamento = data_base.strftime("%Y-%m-%d")
 
@@ -963,6 +992,19 @@ def aceitar_contrato():
         (datetime.utcnow() - timedelta(hours=3)).strftime("%Y-%m-%d %H:%M:%S"),
         aluno_id
     ))
+
+    agora = datetime.utcnow() - timedelta(hours=3)
+    bloqueio_hoje = obter_bloqueio_aulas(cursor, agora.strftime("%Y-%m-%d"))
+    if bloqueio_hoje and agora.strftime("%H:%M") >= bloqueio_hoje["horario_inicio"]:
+        conn.commit()
+        conn.close()
+        session.pop("aluno_pendente_contrato", None)
+        session.pop("aula_pendente_contrato", None)
+        return render_template(
+            "mensagem.html",
+            titulo="Cronograma atualizado",
+            mensagem="O horario de fechamento especial foi atingido. Volte ao cronograma para ver as aulas do dia seguinte."
+        )
 
     data_base = obter_data_base()
     data_agendamento = data_base.strftime("%Y-%m-%d")

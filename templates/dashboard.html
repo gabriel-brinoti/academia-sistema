@@ -50,6 +50,7 @@
 
     <div class="admin-panel">
         <h3>Bloquear aulas por fechamento especial</h3>
+        <p class="subtitulo">No horario informado, as aulas restantes serao bloqueadas e o cronograma do dia seguinte sera liberado.</p>
         <form method="POST" action="{{ url_for('bloqueio_aulas') }}" class="inline-form">
             <label>Data</label>
             <input type="date" name="data_bloqueio" value="{{ data_padrao_bloqueio }}" required>
