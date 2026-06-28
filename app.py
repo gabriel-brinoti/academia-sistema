@@ -46,22 +46,33 @@ def limite_plano(plano, aulas_contratadas=None):
 
     return 0
 
+
+def contar_aulas_usadas(cursor, aluno_id, data_inicio=None):
+    if data_inicio:
+        cursor.execute("""
+            SELECT COUNT(*) AS total
+            FROM agendamentos
+            WHERE aluno_id = %s AND data_agendamento >= %s
+        """, (aluno_id, data_inicio))
+    else:
+        cursor.execute("""
+            SELECT COUNT(*) AS total
+            FROM agendamentos
+            WHERE aluno_id = %s
+        """, (aluno_id,))
+
+    return cursor.fetchone()["total"]
+
+
 def resumo_aulas_mes(cursor, aluno_id, plano):
     cursor.execute("""
-        SELECT COUNT(*) AS total
-        FROM agendamentos
-        WHERE aluno_id = %s
-    """, (aluno_id,))
-
-    usadas_sistema = cursor.fetchone()["total"]
-
-    cursor.execute("""
-        SELECT aulas_contratadas, aulas_usadas_iniciais
+        SELECT aulas_contratadas, aulas_usadas_iniciais, data_inicio
         FROM alunos
         WHERE id = %s
     """, (aluno_id,))
 
     aluno = cursor.fetchone()
+    usadas_sistema = contar_aulas_usadas(cursor, aluno_id, aluno["data_inicio"])
 
     limite = limite_plano(plano, aluno["aulas_contratadas"])
     usadas = usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
@@ -674,10 +685,26 @@ def editar_aluno(id):
     cursor = conn.cursor()
 
     if request.method == "POST":
+        cursor.execute("SELECT * FROM alunos WHERE id = %s", (id,))
+        aluno_atual = cursor.fetchone()
+
         nome = request.form.get("nome", "").strip()
         if not nome:
             conn.close()
             return redirect(url_for("editar_aluno", id=id))
+
+        data_inicio = request.form.get("data_inicio", "")
+        vencimento = request.form.get("vencimento", "")
+        status_pagamento = request.form.get("status_pagamento", "")
+
+        if (
+            aluno_atual
+            and status_pagamento == "Pago"
+            and vencimento
+            and vencimento != (aluno_atual["vencimento"] or "")
+            and data_inicio == (aluno_atual["data_inicio"] or "")
+        ):
+            data_inicio = (datetime.utcnow() - timedelta(hours=3)).strftime("%Y-%m-%d")
 
         cursor.execute("""
             UPDATE alunos
@@ -690,11 +717,11 @@ def editar_aluno(id):
             nome,
             request.form.get("telefone", ""),
             request.form.get("plano", "").upper().strip(),
-            request.form.get("vencimento", ""),
-            request.form.get("status_pagamento", ""),
+            vencimento,
+            status_pagamento,
             request.form.get("observacao", ""),
             request.form.get("data_nascimento", ""),
-            request.form.get("data_inicio", ""),
+            data_inicio,
             request.form.get("aulas_contratadas") or None,
             request.form.get("frequencia", ""),
             request.form.get("aulas_usadas_iniciais") or 0,
@@ -910,13 +937,7 @@ def agendar_aula(aula_id):
     """, (aula_id, data_agendamento))
     ocupadas = cursor.fetchone()["total"]
 
-    cursor.execute("""
-    SELECT COUNT(*) AS total
-    FROM agendamentos
-    WHERE aluno_id = %s
-""", (aluno_id,))
-
-    aulas_usadas_sistema = cursor.fetchone()["total"]
+    aulas_usadas_sistema = contar_aulas_usadas(cursor, aluno_id, aluno["data_inicio"])
     aulas_usadas_total = aulas_usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
 
     limite = limite_plano(aluno["plano"], aluno["aulas_contratadas"])
@@ -1058,13 +1079,7 @@ def aceitar_contrato():
     cursor.execute("SELECT * FROM alunos WHERE id = %s", (aluno_id,))
     aluno = cursor.fetchone()
 
-    cursor.execute("""
-        SELECT COUNT(*) AS total
-        FROM agendamentos
-        WHERE aluno_id = %s
-    """, (aluno_id,))
-
-    aulas_usadas_sistema = cursor.fetchone()["total"]
+    aulas_usadas_sistema = contar_aulas_usadas(cursor, aluno_id, aluno["data_inicio"])
 
     limite = limite_plano(aluno["plano"], aluno["aulas_contratadas"])
     aulas_usadas_total = aulas_usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
