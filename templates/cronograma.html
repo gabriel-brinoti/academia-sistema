@@ -65,7 +65,12 @@
 
             {% if aula.bloqueada %}
                 <div class="aula-bloqueada">
-                    Bloqueada por fechamento especial a partir de {{ aula.horario_bloqueio }}
+                    Bloqueada por fechamento especial de {{ aula.horario_bloqueio }}
+                    {% if aula.horario_fim_bloqueio %}
+                        ate {{ aula.horario_fim_bloqueio }}
+                    {% else %}
+                        ate o fim do dia
+                    {% endif %}
                 </div>
                 <button class="btn-danger" disabled>Bloqueada</button>
             {% elif aula.lotada %}

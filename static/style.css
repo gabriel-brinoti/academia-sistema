@@ -319,6 +319,35 @@ tr:hover td {
     margin-bottom: 10px;
 }
 
+.lista-alunos-aula {
+    border-top: 1px solid #ededed;
+    margin-top: 12px;
+    padding-top: 12px;
+}
+
+.lista-alunos-aula h4 {
+    margin-bottom: 8px;
+}
+
+.lista-alunos-aula ul {
+    list-style: none;
+    padding: 0;
+}
+
+.lista-alunos-aula li {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    padding: 6px 0;
+}
+
+.lista-alunos-aula a {
+    color: #d62828;
+    font-weight: bold;
+    text-decoration: none;
+}
+
 .pago { color: #1f9d55; font-weight: bold; }
 .pendente { color: #d48b00; font-weight: bold; }
 .atrasado { color: #d62828; font-weight: bold; }
