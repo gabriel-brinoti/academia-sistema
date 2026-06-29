@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
@@ -50,19 +50,27 @@
 
     <div class="admin-panel">
         <h3>Bloquear aulas por fechamento especial</h3>
-        <p class="subtitulo">Informe o horario inicial e, se quiser, o horario final. Sem horario final, bloqueia as aulas restantes do dia e libera o cronograma seguinte.</p>
+        <p class="subtitulo">Use "Bloquear ate" apenas quando o fechamento tiver hora para terminar. Se deixar vazio, bloqueia ate o fim do dia.</p>
         <form method="POST" action="{{ url_for('bloqueio_aulas') }}" class="inline-form">
-            <label>Data</label>
-            <input type="date" name="data_bloqueio" value="{{ data_padrao_bloqueio }}" required>
+            <div class="form-field">
+                <label>Data</label>
+                <input type="date" name="data_bloqueio" value="{{ data_padrao_bloqueio }}" required>
+            </div>
 
-            <label>Bloquear de</label>
-            <input type="time" name="horario_inicio" required>
+            <div class="form-field">
+                <label>Bloquear de</label>
+                <input type="time" name="horario_inicio" required>
+            </div>
 
-            <label>Bloquear ate</label>
-            <input type="time" name="horario_fim">
+            <div class="form-field">
+                <label>Bloquear ate</label>
+                <input type="time" name="horario_fim">
+            </div>
 
-            <label>Motivo</label>
-            <input type="text" name="motivo" placeholder="Ex: jogo da Copa">
+            <div class="form-field">
+                <label>Motivo</label>
+                <input type="text" name="motivo" placeholder="Ex: jogo da Copa">
+            </div>
 
             <button type="submit">Bloquear aulas</button>
         </form>
@@ -93,47 +101,74 @@
     </div>
 
     <h2 class="schedule-title">Cronograma do Dia</h2>
-    {% for aula in aulas_hoje %}
-    <div class="aula-card">
-        <div class="aula-linha">{{ aula.horario }} - {{ aula.modalidade }}</div>
-        <div class="progress"><div class="progress-bar" style="width: {{ aula.percentual }}%;"></div></div>
-        <div class="aula-info">{{ aula.ocupadas }} / {{ aula.capacidade }} vagas ocupadas — Restam {{ aula.restantes }}</div>
-        {% if aula.bloqueada %}
-            <div class="aula-bloqueada">
-                Bloqueada por fechamento especial de {{ aula.horario_bloqueio }}
-                {% if aula.horario_fim_bloqueio %}
-                    ate {{ aula.horario_fim_bloqueio }}
+
+    {% macro aula_admin_card(aula) %}
+        <div class="aula-card">
+            <div class="aula-linha">{{ aula.horario }} - {{ aula.modalidade }}</div>
+            <div class="progress"><div class="progress-bar" style="width: {{ aula.percentual }}%;"></div></div>
+            <div class="aula-info">{{ aula.ocupadas }} / {{ aula.capacidade }} vagas ocupadas - Restam {{ aula.restantes }}</div>
+            {% if aula.bloqueada %}
+                <div class="aula-bloqueada">
+                    Bloqueada por fechamento especial de {{ aula.horario_bloqueio }}
+                    {% if aula.horario_fim_bloqueio %}
+                        ate {{ aula.horario_fim_bloqueio }}
+                    {% else %}
+                        ate o fim do dia
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <div class="lista-alunos-aula">
+                <h4>Alunos inscritos nesta aula</h4>
+                {% if aula.inscritos %}
+                    <ul>
+                        {% for inscrito in aula.inscritos %}
+                            <li>
+                                <span>
+                                    {{ inscrito.nome }}
+                                    {% if inscrito.idade is not none %}
+                                        - {{ inscrito.idade }} anos
+                                    {% endif %}
+                                </span>
+                                <a href="{{ url_for('remover_agendamento', agendamento_id=inscrito.agendamento_id, voltar='dashboard') }}"
+                                   onclick="return confirm('Remover este aluno da aula?')">
+                                    Remover
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
                 {% else %}
-                    ate o fim do dia
+                    <p>Nenhum aluno inscrito ate o momento.</p>
                 {% endif %}
             </div>
-        {% endif %}
-
-        <div class="lista-alunos-aula">
-            <h4>Alunos inscritos nesta aula</h4>
-            {% if aula.inscritos %}
-                <ul>
-                    {% for inscrito in aula.inscritos %}
-                        <li>
-                            <span>
-                                {{ inscrito.nome }}
-                                {% if inscrito.idade is not none %}
-                                    - {{ inscrito.idade }} anos
-                                {% endif %}
-                            </span>
-                            <a href="{{ url_for('remover_agendamento', agendamento_id=inscrito.agendamento_id, voltar='dashboard') }}"
-                               onclick="return confirm('Remover este aluno da aula?')">
-                                Remover
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p>Nenhum aluno inscrito ate o momento.</p>
-            {% endif %}
         </div>
-    </div>
-    {% endfor %}
+    {% endmacro %}
+
+    {% if aulas_hoje %}
+        <div class="schedule-columns">
+            <section class="schedule-column">
+                <h3 class="schedule-column-title">Musculacao</h3>
+                {% for aula in aulas_hoje if aula.modalidade == 'MUSCULACAO' %}
+                    {{ aula_admin_card(aula) }}
+                {% else %}
+                    <div class="aula-card"><div class="aula-info">Nao ha horarios de musculacao para hoje.</div></div>
+                {% endfor %}
+            </section>
+
+            <section class="schedule-column">
+                <h3 class="schedule-column-title">Aulas</h3>
+                {% for aula in aulas_hoje if aula.modalidade != 'MUSCULACAO' %}
+                    {{ aula_admin_card(aula) }}
+                {% else %}
+                    <div class="aula-card"><div class="aula-info">Nao ha aulas cadastradas para hoje.</div></div>
+                {% endfor %}
+            </section>
+        </div>
+    {% else %}
+        <div class="aula-card">
+            <div class="aula-info">Nao ha aulas cadastradas para hoje.</div>
+        </div>
+    {% endif %}
 </div>
 </body>
 </html>

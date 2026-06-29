@@ -291,13 +291,22 @@ tr:hover td {
 .inline-form {
     display: grid;
     grid-template-columns: repeat(4, minmax(140px, 1fr));
-    gap: 10px;
+    gap: 12px;
     align-items: end;
 }
 
-.inline-form label {
+.form-field label {
+    display: block;
     font-weight: bold;
-    margin-bottom: -6px;
+    margin-bottom: 6px;
+}
+
+.form-field input {
+    margin: 0;
+}
+
+.inline-form button {
+    align-self: end;
 }
 
 .bloqueios-lista {
