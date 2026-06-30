@@ -47,6 +47,54 @@ def limite_plano(plano, aulas_contratadas=None):
     return 0
 
 
+def calcular_aulas_contratadas_auto(data_inicio, data_fim, frequencia):
+    if not data_inicio or not data_fim or not frequencia:
+        return None
+
+    try:
+        inicio = datetime.strptime(str(data_inicio), "%Y-%m-%d").date()
+        fim = datetime.strptime(str(data_fim), "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+    if fim < inicio:
+        return None
+
+    dias = (fim - inicio).days + 1
+    semanas = dias / 7
+    freq = str(frequencia).lower().strip()
+
+    frequencias_semanais = {
+        "1x_semana": 1,
+        "2x_semana": 2,
+        "3x_semana": 3,
+        "4x_semana": 4,
+        "5x_semana": 5,
+    }
+
+    if freq in frequencias_semanais:
+        return round(semanas * frequencias_semanais[freq])
+    if freq == "1x_dia":
+        return dias
+    if freq == "2x_dia":
+        return dias * 2
+
+    return None
+
+
+def obter_aulas_contratadas_form(data_inicio, vencimento, frequencia):
+    aulas_contratadas = request.form.get("aulas_contratadas") or None
+
+    if not aulas_contratadas:
+        aulas_contratadas = calcular_aulas_contratadas_auto(
+            data_inicio,
+            vencimento,
+            frequencia
+        )
+
+    return aulas_contratadas
+
+
 def contar_aulas_usadas(cursor, aluno_id, data_inicio=None):
     if data_inicio:
         cursor.execute("""
@@ -644,6 +692,14 @@ def novo_aluno():
 
         conn = conectar()
         cursor = conn.cursor()
+        data_inicio = request.form.get("data_inicio", "")
+        vencimento = request.form.get("vencimento", "")
+        frequencia = request.form.get("frequencia", "")
+        aulas_contratadas = obter_aulas_contratadas_form(
+            data_inicio,
+            vencimento,
+            frequencia
+        )
 
         cursor.execute("""
             INSERT INTO alunos (
@@ -656,16 +712,16 @@ def novo_aluno():
             nome,
             request.form.get("telefone", ""),
             request.form.get("plano", "").upper().strip(),
-            request.form.get("vencimento", ""),
+            vencimento,
             request.form.get("status_pagamento", ""),
             request.form.get("observacao", ""),
             12,
             usuario,
             "1234",
             request.form.get("data_nascimento", ""),
-            request.form.get("data_inicio", ""),
-            request.form.get("aulas_contratadas") or None,
-            request.form.get("frequencia", ""),
+            data_inicio,
+            aulas_contratadas,
+            frequencia,
             request.form.get("aulas_usadas_iniciais") or 0
         ))
 
@@ -696,6 +752,7 @@ def editar_aluno(id):
         data_inicio = request.form.get("data_inicio", "")
         vencimento = request.form.get("vencimento", "")
         status_pagamento = request.form.get("status_pagamento", "")
+        frequencia = request.form.get("frequencia", "")
 
         if (
             aluno_atual
@@ -705,6 +762,12 @@ def editar_aluno(id):
             and data_inicio == (aluno_atual["data_inicio"] or "")
         ):
             data_inicio = (datetime.utcnow() - timedelta(hours=3)).strftime("%Y-%m-%d")
+
+        aulas_contratadas = obter_aulas_contratadas_form(
+            data_inicio,
+            vencimento,
+            frequencia
+        )
 
         cursor.execute("""
             UPDATE alunos
@@ -722,8 +785,8 @@ def editar_aluno(id):
             request.form.get("observacao", ""),
             request.form.get("data_nascimento", ""),
             data_inicio,
-            request.form.get("aulas_contratadas") or None,
-            request.form.get("frequencia", ""),
+            aulas_contratadas,
+            frequencia,
             request.form.get("aulas_usadas_iniciais") or 0,
             id
         ))
