@@ -251,13 +251,41 @@ def sincronizar_aulas_padrao(cursor):
         """, (aula["id"],))
 
 
-def obter_bloqueio_aulas(cursor, data_agendamento):
+def aula_eh_musculacao(aula):
+    return aula and aula["modalidade"] == "MUSCULACAO"
+
+
+def normalizar_tipo_bloqueio(tipo):
+    tipo = str(tipo or "TODAS").upper().strip()
+    if tipo in ("AULAS", "MUSCULACAO"):
+        return tipo
+    return "TODAS"
+
+
+def obter_bloqueios_aulas(cursor, data_agendamento):
     cursor.execute("""
-        SELECT data_bloqueio, horario_inicio, horario_fim, motivo
+        SELECT data_bloqueio, horario_inicio, horario_fim, motivo, tipo
         FROM bloqueios_aulas
         WHERE data_bloqueio = %s
     """, (data_agendamento,))
-    return cursor.fetchone()
+    return cursor.fetchall()
+
+
+def obter_bloqueio_para_aula(aula, bloqueios):
+    if not aula or not bloqueios:
+        return None
+
+    tipo_aula = "MUSCULACAO" if aula_eh_musculacao(aula) else "AULAS"
+    bloqueio_todas = None
+
+    for bloqueio in bloqueios:
+        tipo = normalizar_tipo_bloqueio(bloqueio.get("tipo"))
+        if tipo == tipo_aula:
+            return bloqueio
+        if tipo == "TODAS":
+            bloqueio_todas = bloqueio
+
+    return bloqueio_todas
 
 
 def aula_bloqueada_por_horario(aula, bloqueio):
@@ -329,15 +357,33 @@ def init_db():
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS bloqueios_aulas (
-            data_bloqueio TEXT PRIMARY KEY,
+            data_bloqueio TEXT,
             horario_inicio TEXT,
             horario_fim TEXT,
+            tipo TEXT DEFAULT 'TODAS',
             motivo TEXT
         )
     """)
 
     cursor.execute("""
         ALTER TABLE bloqueios_aulas ADD COLUMN IF NOT EXISTS horario_fim TEXT
+    """)
+
+    cursor.execute("""
+        ALTER TABLE bloqueios_aulas ADD COLUMN IF NOT EXISTS tipo TEXT DEFAULT 'TODAS'
+    """)
+
+    cursor.execute("""
+        UPDATE bloqueios_aulas SET tipo = 'TODAS' WHERE tipo IS NULL OR tipo = ''
+    """)
+
+    cursor.execute("""
+        ALTER TABLE bloqueios_aulas DROP CONSTRAINT IF EXISTS bloqueios_aulas_pkey
+    """)
+
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_bloqueios_aulas_data_tipo
+        ON bloqueios_aulas (data_bloqueio, tipo)
     """)
 
     cursor.execute("""
@@ -384,17 +430,31 @@ def obter_horario_bloqueio(data_bloqueio):
     conn = conectar()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT horario_inicio, horario_fim
+        SELECT horario_inicio, horario_fim, tipo
         FROM bloqueios_aulas
         WHERE data_bloqueio = %s
     """, (data_bloqueio.strftime("%Y-%m-%d"),))
-    bloqueio = cursor.fetchone()
+    bloqueios = cursor.fetchall()
     conn.close()
 
-    if not bloqueio or bloqueio.get("horario_fim"):
-        return None
+    bloqueios_resto_dia = [
+        bloqueio for bloqueio in bloqueios
+        if not bloqueio.get("horario_fim")
+    ]
 
-    return bloqueio["horario_inicio"]
+    for bloqueio in bloqueios_resto_dia:
+        if normalizar_tipo_bloqueio(bloqueio.get("tipo")) == "TODAS":
+            return bloqueio["horario_inicio"]
+
+    tipos = {
+        normalizar_tipo_bloqueio(bloqueio.get("tipo"))
+        for bloqueio in bloqueios_resto_dia
+    }
+
+    if {"AULAS", "MUSCULACAO"}.issubset(tipos):
+        return min(bloqueio["horario_inicio"] for bloqueio in bloqueios_resto_dia)
+
+    return None
 
 
 def obter_data_base():
@@ -461,7 +521,7 @@ def listar_aulas_do_dia(dia_semana=None):
         ORDER BY a.horario
     """, (hoje, dia_semana))
     aulas = cursor.fetchall()
-    bloqueio = obter_bloqueio_aulas(cursor, hoje)
+    bloqueios = obter_bloqueios_aulas(cursor, hoje)
 
     dados = []
     for aula in aulas:
@@ -494,10 +554,12 @@ def listar_aulas_do_dia(dia_semana=None):
         item["restantes"] = max(capacidade - ocupadas, 0)
         item["percentual"] = int((ocupadas / capacidade) * 100) if capacidade else 0
         item["lotada"] = ocupadas >= capacidade
+        bloqueio = obter_bloqueio_para_aula(aula, bloqueios)
         item["bloqueada"] = aula_bloqueada_por_horario(aula, bloqueio)
         item["horario_bloqueio"] = bloqueio["horario_inicio"] if bloqueio else None
         item["horario_fim_bloqueio"] = bloqueio["horario_fim"] if bloqueio else None
         item["motivo_bloqueio"] = bloqueio["motivo"] if bloqueio else None
+        item["tipo_bloqueio"] = bloqueio["tipo"] if bloqueio else None
         item["inscritos"] = inscritos
         dados.append(item)
 
@@ -555,9 +617,9 @@ def dashboard():
     alunos = cursor.fetchall()
 
     cursor.execute("""
-        SELECT data_bloqueio, horario_inicio, horario_fim, motivo
+        SELECT data_bloqueio, horario_inicio, horario_fim, motivo, tipo
         FROM bloqueios_aulas
-        ORDER BY data_bloqueio DESC
+        ORDER BY data_bloqueio DESC, tipo ASC
         LIMIT 10
     """)
     bloqueios_aulas = cursor.fetchall()
@@ -587,6 +649,7 @@ def bloqueio_aulas():
     data_bloqueio = request.form.get("data_bloqueio", "")
     horario_inicio = request.form.get("horario_inicio", "")
     horario_fim = request.form.get("horario_fim", "")
+    tipo = normalizar_tipo_bloqueio(request.form.get("tipo_bloqueio", "TODAS"))
     motivo = request.form.get("motivo", "")
 
     if horario_fim and horario_fim <= horario_inicio:
@@ -596,27 +659,30 @@ def bloqueio_aulas():
         conn = conectar()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO bloqueios_aulas (data_bloqueio, horario_inicio, horario_fim, motivo)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (data_bloqueio)
+            INSERT INTO bloqueios_aulas (data_bloqueio, horario_inicio, horario_fim, tipo, motivo)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (data_bloqueio, tipo)
             DO UPDATE SET horario_inicio = EXCLUDED.horario_inicio,
                           horario_fim = EXCLUDED.horario_fim,
                           motivo = EXCLUDED.motivo
-        """, (data_bloqueio, horario_inicio, horario_fim or None, motivo))
+        """, (data_bloqueio, horario_inicio, horario_fim or None, tipo, motivo))
         conn.commit()
         conn.close()
 
     return redirect(url_for("dashboard"))
 
 
-@app.route("/remover_bloqueio_aulas/<data_bloqueio>", methods=["POST"])
-def remover_bloqueio_aulas(data_bloqueio):
+@app.route("/remover_bloqueio_aulas/<data_bloqueio>/<tipo>", methods=["POST"])
+def remover_bloqueio_aulas(data_bloqueio, tipo):
     if "admin_logado" not in session:
         return redirect(url_for("login"))
 
     conn = conectar()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM bloqueios_aulas WHERE data_bloqueio = %s", (data_bloqueio,))
+    cursor.execute(
+        "DELETE FROM bloqueios_aulas WHERE data_bloqueio = %s AND tipo = %s",
+        (data_bloqueio, normalizar_tipo_bloqueio(tipo))
+    )
     conn.commit()
     conn.close()
 
@@ -971,7 +1037,8 @@ def agendar_aula(aula_id):
         )
 
     agora = datetime.utcnow() - timedelta(hours=3)
-    bloqueio_hoje = obter_bloqueio_aulas(cursor, agora.strftime("%Y-%m-%d"))
+    bloqueios_hoje = obter_bloqueios_aulas(cursor, agora.strftime("%Y-%m-%d"))
+    bloqueio_hoje = obter_bloqueio_para_aula(aula, bloqueios_hoje)
     if bloqueio_fecha_resto_do_dia(bloqueio_hoje) and agora.strftime("%H:%M") >= bloqueio_hoje["horario_inicio"]:
         conn.close()
         return render_template(
@@ -983,7 +1050,8 @@ def agendar_aula(aula_id):
     data_base = obter_data_base()
     data_agendamento = data_base.strftime("%Y-%m-%d")
 
-    bloqueio = obter_bloqueio_aulas(cursor, data_agendamento)
+    bloqueios = obter_bloqueios_aulas(cursor, data_agendamento)
+    bloqueio = obter_bloqueio_para_aula(aula, bloqueios)
     if aula_bloqueada_por_horario(aula, bloqueio):
         conn.close()
         return render_template(
@@ -1101,8 +1169,12 @@ def aceitar_contrato():
         aluno_id
     ))
 
+    cursor.execute("SELECT * FROM aulas WHERE id = %s", (aula_id,))
+    aula = cursor.fetchone()
+
     agora = datetime.utcnow() - timedelta(hours=3)
-    bloqueio_hoje = obter_bloqueio_aulas(cursor, agora.strftime("%Y-%m-%d"))
+    bloqueios_hoje = obter_bloqueios_aulas(cursor, agora.strftime("%Y-%m-%d"))
+    bloqueio_hoje = obter_bloqueio_para_aula(aula, bloqueios_hoje)
     if bloqueio_fecha_resto_do_dia(bloqueio_hoje) and agora.strftime("%H:%M") >= bloqueio_hoje["horario_inicio"]:
         conn.commit()
         conn.close()
@@ -1117,10 +1189,8 @@ def aceitar_contrato():
     data_base = obter_data_base()
     data_agendamento = data_base.strftime("%Y-%m-%d")
 
-    cursor.execute("SELECT * FROM aulas WHERE id = %s", (aula_id,))
-    aula = cursor.fetchone()
-
-    bloqueio = obter_bloqueio_aulas(cursor, data_agendamento)
+    bloqueios = obter_bloqueios_aulas(cursor, data_agendamento)
+    bloqueio = obter_bloqueio_para_aula(aula, bloqueios)
     if aula and aula_bloqueada_por_horario(aula, bloqueio):
         conn.close()
         session.pop("aluno_pendente_contrato", None)

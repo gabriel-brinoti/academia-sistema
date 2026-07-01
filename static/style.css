@@ -290,7 +290,7 @@ tr:hover td {
 
 .inline-form {
     display: grid;
-    grid-template-columns: repeat(4, minmax(140px, 1fr));
+    grid-template-columns: repeat(5, minmax(140px, 1fr));
     gap: 12px;
     align-items: end;
 }
@@ -301,7 +301,8 @@ tr:hover td {
     margin-bottom: 6px;
 }
 
-.form-field input {
+.form-field input,
+.form-field select {
     margin: 0;
 }
 
