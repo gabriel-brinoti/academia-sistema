@@ -31,6 +31,22 @@ def normalizar_nome(texto):
     return remover_acentos(" ".join(str(texto or "").split())).casefold()
 
 
+def data_hoje_brasil():
+    return (datetime.utcnow() - timedelta(hours=3)).date()
+
+
+def atualizar_status_vencidos(cursor):
+    hoje = data_hoje_brasil().strftime("%Y-%m-%d")
+    cursor.execute("""
+        UPDATE alunos
+        SET status_pagamento = 'Atrasado'
+        WHERE vencimento IS NOT NULL
+          AND vencimento <> ''
+          AND vencimento < %s
+          AND status_pagamento <> 'Atrasado'
+    """, (hoje,))
+
+
 def limite_plano(plano, aulas_contratadas=None):
     if aulas_contratadas:
         return int(aulas_contratadas)
@@ -600,6 +616,8 @@ def dashboard():
 
     conn = conectar()
     cursor = conn.cursor()
+    atualizar_status_vencidos(cursor)
+    conn.commit()
 
     cursor.execute("SELECT COUNT(*) AS total FROM alunos")
     total = cursor.fetchone()["total"]
@@ -698,6 +716,8 @@ def alunos():
     status = request.args.get("status", "").strip()
     conn = conectar()
     cursor = conn.cursor()
+    atualizar_status_vencidos(cursor)
+    conn.commit()
 
     if busca and status:
         cursor.execute(
@@ -819,15 +839,22 @@ def editar_aluno(id):
         vencimento = request.form.get("vencimento", "")
         status_pagamento = request.form.get("status_pagamento", "")
         frequencia = request.form.get("frequencia", "")
-
-        if (
+        aulas_usadas_iniciais = request.form.get("aulas_usadas_iniciais") or 0
+        renovacao_plano = (
             aluno_atual
             and status_pagamento == "Pago"
             and vencimento
             and vencimento != (aluno_atual["vencimento"] or "")
+        )
+
+        if (
+            renovacao_plano
             and data_inicio == (aluno_atual["data_inicio"] or "")
         ):
             data_inicio = (datetime.utcnow() - timedelta(hours=3)).strftime("%Y-%m-%d")
+
+        if renovacao_plano:
+            aulas_usadas_iniciais = 0
 
         aulas_contratadas = obter_aulas_contratadas_form(
             data_inicio,
@@ -853,7 +880,7 @@ def editar_aluno(id):
             data_inicio,
             aulas_contratadas,
             frequencia,
-            request.form.get("aulas_usadas_iniciais") or 0,
+            aulas_usadas_iniciais,
             id
         ))
         conn.commit()
@@ -955,6 +982,8 @@ def cronograma():
 
     conn = conectar()
     cursor = conn.cursor()
+    atualizar_status_vencidos(cursor)
+    conn.commit()
     cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
     alunos = cursor.fetchall()
     conn.close()
@@ -979,6 +1008,8 @@ def painel_professor():
 
     conn = conectar()
     cursor = conn.cursor()
+    atualizar_status_vencidos(cursor)
+    conn.commit()
     cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
     alunos = cursor.fetchall()
     conn.close()
@@ -999,6 +1030,8 @@ def agendar_aula(aula_id):
 
     conn = conectar()
     cursor = conn.cursor()
+    atualizar_status_vencidos(cursor)
+    conn.commit()
 
     cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
     nome_normalizado = normalizar_nome(nome_digitado)
@@ -1158,6 +1191,21 @@ def aceitar_contrato():
 
     conn = conectar()
     cursor = conn.cursor()
+    atualizar_status_vencidos(cursor)
+    conn.commit()
+
+    cursor.execute("SELECT * FROM alunos WHERE id = %s", (aluno_id,))
+    aluno = cursor.fetchone()
+
+    if aluno and aluno["status_pagamento"] == "Atrasado":
+        conn.close()
+        session.pop("aluno_pendente_contrato", None)
+        session.pop("aula_pendente_contrato", None)
+        return render_template(
+            "mensagem.html",
+            titulo="Aula nao marcada",
+            mensagem="Aula nao marcada porque o pagamento esta em atraso. Procure a administracao da academia para regularizar."
+        )
 
     cursor.execute("""
         UPDATE alunos
