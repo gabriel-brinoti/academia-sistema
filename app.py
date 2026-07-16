@@ -47,6 +47,134 @@ def atualizar_status_vencidos(cursor):
     """, (hoje,))
 
 
+def normalizar_plano(texto):
+    return remover_acentos(" ".join(str(texto or "").split())).upper()
+
+
+def inteiro_ou_zero(valor):
+    try:
+        return int(valor or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def escolher_status_pagamento(alunos):
+    prioridade = {"Pago": 3, "Pendente": 2, "Atrasado": 1}
+    return max(
+        (aluno.get("status_pagamento") or "" for aluno in alunos),
+        key=lambda status: prioridade.get(status, 0),
+        default=""
+    )
+
+
+def primeiro_valor(alunos, campo):
+    for aluno in alunos:
+        valor = aluno.get(campo)
+        if valor not in (None, ""):
+            return valor
+    return ""
+
+
+def unir_grupo_alunos_duplicados(cursor, alunos):
+    alunos_ordenados = sorted(
+        alunos,
+        key=lambda aluno: (
+            aluno.get("vencimento") or "",
+            1 if aluno.get("aceitou_contrato") else 0,
+            aluno.get("id") or 0
+        ),
+        reverse=True
+    )
+    principal = alunos_ordenados[0]
+    duplicados = alunos_ordenados[1:]
+    principal_id = principal["id"]
+
+    aulas_usadas_iniciais = sum(
+        inteiro_ou_zero(aluno.get("aulas_usadas_iniciais"))
+        for aluno in alunos_ordenados
+    )
+    aulas_contratadas = inteiro_ou_zero(principal.get("aulas_contratadas")) or max(
+        [inteiro_ou_zero(aluno.get("aulas_contratadas")) for aluno in alunos_ordenados],
+        default=0
+    ) or None
+    data_inicio = min(
+        [aluno.get("data_inicio") for aluno in alunos_ordenados if aluno.get("data_inicio")],
+        default=""
+    )
+    vencimento = max(
+        [aluno.get("vencimento") for aluno in alunos_ordenados if aluno.get("vencimento")],
+        default=""
+    )
+    aceitou_contrato = any(aluno.get("aceitou_contrato") for aluno in alunos_ordenados)
+    data_aceite_contrato = max(
+        [aluno.get("data_aceite_contrato") for aluno in alunos_ordenados if aluno.get("data_aceite_contrato")],
+        default=None
+    )
+
+    for duplicado in duplicados:
+        duplicado_id = duplicado["id"]
+        cursor.execute("""
+            UPDATE agendamentos ag
+            SET aluno_id = %s
+            WHERE ag.aluno_id = %s
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM agendamentos existente
+                  WHERE existente.aluno_id = %s
+                    AND existente.aula_id = ag.aula_id
+                    AND existente.data_agendamento = ag.data_agendamento
+              )
+        """, (principal_id, duplicado_id, principal_id))
+        cursor.execute("DELETE FROM agendamentos WHERE aluno_id = %s", (duplicado_id,))
+        cursor.execute("DELETE FROM alunos WHERE id = %s", (duplicado_id,))
+
+    cursor.execute("""
+        UPDATE alunos
+        SET telefone = %s,
+            vencimento = %s,
+            status_pagamento = %s,
+            observacao = %s,
+            data_nascimento = %s,
+            data_inicio = %s,
+            aulas_contratadas = %s,
+            frequencia = %s,
+            aulas_usadas_iniciais = %s,
+            aceitou_contrato = %s,
+            data_aceite_contrato = %s
+        WHERE id = %s
+    """, (
+        primeiro_valor(alunos_ordenados, "telefone"),
+        vencimento,
+        escolher_status_pagamento(alunos_ordenados),
+        primeiro_valor(alunos_ordenados, "observacao"),
+        primeiro_valor(alunos_ordenados, "data_nascimento"),
+        data_inicio,
+        aulas_contratadas,
+        primeiro_valor(alunos_ordenados, "frequencia"),
+        aulas_usadas_iniciais,
+        aceitou_contrato,
+        data_aceite_contrato,
+        principal_id
+    ))
+
+
+def unificar_alunos_duplicados(cursor):
+    cursor.execute("SELECT * FROM alunos ORDER BY id ASC")
+    grupos = {}
+
+    for aluno in cursor.fetchall():
+        chave_nome = normalizar_nome(aluno.get("nome"))
+        chave_plano = normalizar_plano(aluno.get("plano"))
+        if not chave_nome or not chave_plano:
+            continue
+
+        grupos.setdefault((chave_nome, chave_plano), []).append(aluno)
+
+    for alunos in grupos.values():
+        if len(alunos) > 1:
+            unir_grupo_alunos_duplicados(cursor, alunos)
+
+
 def limite_plano(plano, aulas_contratadas=None):
     if aulas_contratadas:
         return int(aulas_contratadas)
@@ -617,6 +745,7 @@ def dashboard():
     conn = conectar()
     cursor = conn.cursor()
     atualizar_status_vencidos(cursor)
+    unificar_alunos_duplicados(cursor)
     conn.commit()
 
     cursor.execute("SELECT COUNT(*) AS total FROM alunos")
@@ -717,6 +846,7 @@ def alunos():
     conn = conectar()
     cursor = conn.cursor()
     atualizar_status_vencidos(cursor)
+    unificar_alunos_duplicados(cursor)
     conn.commit()
 
     if busca and status:
@@ -811,6 +941,7 @@ def novo_aluno():
             request.form.get("aulas_usadas_iniciais") or 0
         ))
 
+        unificar_alunos_duplicados(cursor)
         conn.commit()
         conn.close()
         return redirect(url_for("alunos"))
@@ -883,6 +1014,7 @@ def editar_aluno(id):
             aulas_usadas_iniciais,
             id
         ))
+        unificar_alunos_duplicados(cursor)
         conn.commit()
         conn.close()
         return redirect(url_for("alunos"))
@@ -966,6 +1098,7 @@ def importar_excel():
                         aulas_usadas_iniciais
                     ))
 
+                unificar_alunos_duplicados(cursor)
                 conn.commit()
                 conn.close()
                 return redirect(url_for("alunos"))
@@ -983,6 +1116,7 @@ def cronograma():
     conn = conectar()
     cursor = conn.cursor()
     atualizar_status_vencidos(cursor)
+    unificar_alunos_duplicados(cursor)
     conn.commit()
     cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
     alunos = cursor.fetchall()
@@ -1009,6 +1143,7 @@ def painel_professor():
     conn = conectar()
     cursor = conn.cursor()
     atualizar_status_vencidos(cursor)
+    unificar_alunos_duplicados(cursor)
     conn.commit()
     cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
     alunos = cursor.fetchall()
@@ -1027,10 +1162,15 @@ def painel_professor():
 @app.route("/agendar_aula/<int:aula_id>", methods=["POST"])
 def agendar_aula(aula_id):
     nome_digitado = request.form.get("nome_aluno", "")
+    voltar_dashboard = (
+        request.form.get("voltar") == "dashboard"
+        and "admin_logado" in session
+    )
 
     conn = conectar()
     cursor = conn.cursor()
     atualizar_status_vencidos(cursor)
+    unificar_alunos_duplicados(cursor)
     conn.commit()
 
     cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
@@ -1131,9 +1271,11 @@ def agendar_aula(aula_id):
 
     if cursor.fetchone():
         conn.close()
+        if voltar_dashboard:
+            return redirect(url_for("dashboard"))
         return redirect(url_for("cronograma"))
     
-    if not aluno["aceitou_contrato"]:
+    if not aluno["aceitou_contrato"] and not voltar_dashboard:
         session["aluno_pendente_contrato"] = aluno["id"]
         session["aula_pendente_contrato"] = aula_id
         conn.close()
@@ -1150,6 +1292,9 @@ def agendar_aula(aula_id):
     aulas_usadas_total = aulas_usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
     restantes = max(limite - aulas_usadas_total, 0)
     conn.close()
+
+    if voltar_dashboard:
+        return redirect(url_for("dashboard"))
 
     return render_template(
     "agendamento_sucesso.html",

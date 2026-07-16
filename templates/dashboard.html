@@ -118,6 +118,12 @@
 
     <h2 class="schedule-title">Cronograma do Dia</h2>
 
+    <datalist id="lista_alunos_admin">
+        {% for aluno in alunos %}
+            <option value="{{ aluno.nome }}">
+        {% endfor %}
+    </datalist>
+
     {% macro aula_admin_card(aula) %}
         <div class="aula-card">
             <div class="aula-linha">{{ aula.horario }} - {{ aula.modalidade }}</div>
@@ -132,6 +138,14 @@
                         ate o fim do dia
                     {% endif %}
                 </div>
+            {% endif %}
+
+            {% if not aula.bloqueada and not aula.lotada %}
+                <form method="POST" action="{{ url_for('agendar_aula', aula_id=aula.id) }}" class="admin-agendar-form">
+                    <input type="hidden" name="voltar" value="dashboard">
+                    <input type="text" name="nome_aluno" list="lista_alunos_admin" autocomplete="off" placeholder="Nome do aluno" required>
+                    <button type="submit">Adicionar aluno</button>
+                </form>
             {% endif %}
 
             <div class="lista-alunos-aula">

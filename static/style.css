@@ -329,6 +329,23 @@ tr:hover td {
     margin-bottom: 10px;
 }
 
+.admin-agendar-form {
+    align-items: center;
+    border-top: 1px solid #ededed;
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 12px;
+}
+
+.admin-agendar-form input {
+    margin: 0;
+}
+
+.admin-agendar-form button {
+    white-space: nowrap;
+}
+
 .lista-alunos-aula {
     border-top: 1px solid #ededed;
     margin-top: 12px;
@@ -414,6 +431,11 @@ tr:hover td {
     }
 
     .actions, .footer-actions, .busca-box {
+        flex-direction: column;
+    }
+
+    .admin-agendar-form {
+        align-items: stretch;
         flex-direction: column;
     }
 }
