@@ -47,6 +47,14 @@ def atualizar_status_vencidos(cursor):
     """, (hoje,))
 
 
+def limpar_bloqueios_antigos(cursor):
+    hoje = data_hoje_brasil().strftime("%Y-%m-%d")
+    cursor.execute("""
+        DELETE FROM bloqueios_aulas
+        WHERE data_bloqueio < %s
+    """, (hoje,))
+
+
 def normalizar_plano(texto):
     return remover_acentos(" ".join(str(texto or "").split())).upper()
 
@@ -746,6 +754,7 @@ def dashboard():
     cursor = conn.cursor()
     atualizar_status_vencidos(cursor)
     unificar_alunos_duplicados(cursor)
+    limpar_bloqueios_antigos(cursor)
     conn.commit()
 
     cursor.execute("SELECT COUNT(*) AS total FROM alunos")
@@ -766,9 +775,10 @@ def dashboard():
     cursor.execute("""
         SELECT data_bloqueio, horario_inicio, horario_fim, motivo, tipo
         FROM bloqueios_aulas
-        ORDER BY data_bloqueio DESC, tipo ASC
+        WHERE data_bloqueio >= %s
+        ORDER BY data_bloqueio ASC, horario_inicio ASC, tipo ASC
         LIMIT 10
-    """)
+    """, (data_hoje_brasil().strftime("%Y-%m-%d"),))
     bloqueios_aulas = cursor.fetchall()
 
     dia_atual, aulas_hoje = listar_aulas_do_dia()
@@ -802,9 +812,13 @@ def bloqueio_aulas():
     if horario_fim and horario_fim <= horario_inicio:
         horario_fim = ""
 
+    if data_bloqueio and data_bloqueio < data_hoje_brasil().strftime("%Y-%m-%d"):
+        return redirect(url_for("dashboard"))
+
     if data_bloqueio and horario_inicio:
         conn = conectar()
         cursor = conn.cursor()
+        limpar_bloqueios_antigos(cursor)
         cursor.execute("""
             INSERT INTO bloqueios_aulas (data_bloqueio, horario_inicio, horario_fim, tipo, motivo)
             VALUES (%s, %s, %s, %s, %s)
