@@ -900,17 +900,21 @@ def baixar_backup():
     )
 
 
-@app.route("/restaurar_backup", methods=["POST"])
+@app.route("/restaurar_backup", methods=["GET", "POST"])
 def restaurar_backup():
-    if "admin_logado" not in session:
-        return redirect(url_for("login"))
-
-    arquivo = request.files.get("arquivo_backup")
-    if not arquivo or arquivo.filename == "":
-        return redirect(url_for("dev_backup", erro="Selecione um arquivo de backup em Excel."))
-
     conn = None
+
     try:
+        if "admin_logado" not in session:
+            return redirect(url_for("login"))
+
+        if request.method != "POST":
+            return redirect(url_for("dev_backup"))
+
+        arquivo = request.files.get("arquivo_backup")
+        if not arquivo or arquivo.filename == "":
+            return redirect(url_for("dev_backup", erro="Selecione um arquivo de backup em Excel."))
+
         abas = pd.read_excel(arquivo, sheet_name=None, engine="openpyxl")
         conn = conectar()
         cursor = conn.cursor()
@@ -938,12 +942,13 @@ def restaurar_backup():
         atualizar_status_vencidos(cursor)
         unificar_alunos_duplicados(cursor)
         conn.commit()
-        conn.close()
     except Exception as e:
         if conn:
             conn.rollback()
-            conn.close()
         return redirect(url_for("dev_backup", erro=f"Erro ao restaurar backup: {e}"))
+    finally:
+        if conn:
+            conn.close()
 
     return redirect(url_for("dev_backup", sucesso="Backup restaurado com sucesso."))
 
