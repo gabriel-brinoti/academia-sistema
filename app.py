@@ -4,7 +4,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import pandas as pd
 import unicodedata
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, time, timedelta
 from io import BytesIO
 
 app = Flask(__name__)
@@ -207,6 +207,12 @@ def valor_backup(valor):
         if valor.time() == datetime.min.time():
             return valor.strftime("%Y-%m-%d")
         return valor.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(valor, datetime):
+        return valor.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(valor, date):
+        return valor.strftime("%Y-%m-%d")
+    if isinstance(valor, time):
+        return valor.strftime("%H:%M")
     return valor
 
 
@@ -855,7 +861,11 @@ def dev_backup():
     if "admin_logado" not in session:
         return redirect(url_for("login"))
 
-    return render_template("dev_backup.html")
+    return render_template(
+        "dev_backup.html",
+        erro=request.args.get("erro", ""),
+        sucesso=request.args.get("sucesso", "")
+    )
 
 
 @app.route("/baixar_backup")
@@ -897,8 +907,9 @@ def restaurar_backup():
 
     arquivo = request.files.get("arquivo_backup")
     if not arquivo or arquivo.filename == "":
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("dev_backup", erro="Selecione um arquivo de backup em Excel."))
 
+    conn = None
     try:
         abas = pd.read_excel(arquivo, sheet_name=None, engine="openpyxl")
         conn = conectar()
@@ -928,10 +939,13 @@ def restaurar_backup():
         unificar_alunos_duplicados(cursor)
         conn.commit()
         conn.close()
-    except Exception:
-        return redirect(url_for("dashboard"))
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        return redirect(url_for("dev_backup", erro=f"Erro ao restaurar backup: {e}"))
 
-    return redirect(url_for("dashboard"))
+    return redirect(url_for("dev_backup", sucesso="Backup restaurado com sucesso."))
 
 
 @app.route("/bloqueio_aulas", methods=["POST"])

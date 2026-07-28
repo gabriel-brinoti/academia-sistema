@@ -26,6 +26,14 @@
         <h2>Backup do sistema</h2>
         <p class="subtitulo">Rota oculta para uso tecnico. Baixe uma copia em Excel antes de trocar banco ou fazer ajustes grandes.</p>
 
+        {% if erro %}
+            <p class="erro">{{ erro }}</p>
+        {% endif %}
+
+        {% if sucesso %}
+            <p class="sucesso">{{ sucesso }}</p>
+        {% endif %}
+
         <div class="backup-actions">
             <a class="btn" href="{{ url_for('baixar_backup') }}">Baixar backup em Excel</a>
 

@@ -398,6 +398,7 @@ tr:hover td {
 .pendente { color: #d48b00; font-weight: bold; }
 .atrasado { color: #d62828; font-weight: bold; }
 .erro { color: #d62828; margin-bottom: 12px; font-weight: bold; }
+.sucesso { color: #1f9d55; margin-bottom: 12px; font-weight: bold; }
 
 .logo-center {
     text-align: center;
