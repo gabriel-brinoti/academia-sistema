@@ -61,11 +61,7 @@
             <td>{{ aluno.plano }}</td>
             <td>{{ aluno.resumo_aulas }}</td>
             <td>
-                {% if aluno.vencimento %}
-                    {{ aluno.vencimento[8:10] }}/{{ aluno.vencimento[5:7] }}/{{ aluno.vencimento[0:4] }}
-                {% else %}
-                    -
-                {% endif %}
+                {{ formatar_data_brasil(aluno.vencimento) }}
             </td>
             <td class="{{ aluno.status_pagamento|lower }}">{{ aluno.status_pagamento }}</td>
             <td>

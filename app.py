@@ -36,6 +36,20 @@ def data_hoje_brasil():
     return (datetime.utcnow() - timedelta(hours=3)).date()
 
 
+def formatar_data_brasil(valor):
+    if not valor:
+        return "-"
+    if isinstance(valor, datetime):
+        return valor.strftime("%d/%m/%Y")
+    if isinstance(valor, date):
+        return valor.strftime("%d/%m/%Y")
+
+    texto = str(valor)
+    if len(texto) >= 10 and texto[4:5] == "-" and texto[7:8] == "-":
+        return f"{texto[8:10]}/{texto[5:7]}/{texto[0:4]}"
+    return texto
+
+
 def atualizar_status_vencidos(cursor):
     hoje = data_hoje_brasil().strftime("%Y-%m-%d")
     cursor.execute("""
@@ -84,11 +98,19 @@ def primeiro_valor(alunos, campo):
     return ""
 
 
+def texto_ordenavel(valor):
+    if valor in (None, ""):
+        return ""
+    if isinstance(valor, (datetime, date, time)):
+        return valor.isoformat()
+    return str(valor)
+
+
 def unir_grupo_alunos_duplicados(cursor, alunos):
     alunos_ordenados = sorted(
         alunos,
         key=lambda aluno: (
-            aluno.get("vencimento") or "",
+            texto_ordenavel(aluno.get("vencimento")),
             1 if aluno.get("aceitou_contrato") else 0,
             aluno.get("id") or 0
         ),
@@ -107,16 +129,16 @@ def unir_grupo_alunos_duplicados(cursor, alunos):
         default=0
     ) or None
     data_inicio = min(
-        [aluno.get("data_inicio") for aluno in alunos_ordenados if aluno.get("data_inicio")],
+        [texto_ordenavel(aluno.get("data_inicio")) for aluno in alunos_ordenados if aluno.get("data_inicio")],
         default=""
     )
     vencimento = max(
-        [aluno.get("vencimento") for aluno in alunos_ordenados if aluno.get("vencimento")],
+        [texto_ordenavel(aluno.get("vencimento")) for aluno in alunos_ordenados if aluno.get("vencimento")],
         default=""
     )
     aceitou_contrato = any(aluno.get("aceitou_contrato") for aluno in alunos_ordenados)
     data_aceite_contrato = max(
-        [aluno.get("data_aceite_contrato") for aluno in alunos_ordenados if aluno.get("data_aceite_contrato")],
+        [texto_ordenavel(aluno.get("data_aceite_contrato")) for aluno in alunos_ordenados if aluno.get("data_aceite_contrato")],
         default=None
     )
 
@@ -182,6 +204,22 @@ def unificar_alunos_duplicados(cursor):
     for alunos in grupos.values():
         if len(alunos) > 1:
             unir_grupo_alunos_duplicados(cursor, alunos)
+
+
+def manutencao_basica_segura(conn, cursor, unificar=True, limpar_bloqueios=False):
+    try:
+        atualizar_status_vencidos(cursor)
+        if unificar:
+            unificar_alunos_duplicados(cursor)
+        if limpar_bloqueios:
+            limpar_bloqueios_antigos(cursor)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        atualizar_status_vencidos(cursor)
+        if limpar_bloqueios:
+            limpar_bloqueios_antigos(cursor)
+        conn.commit()
 
 
 TABELAS_BACKUP = {
@@ -810,10 +848,7 @@ def dashboard():
 
     conn = conectar()
     cursor = conn.cursor()
-    atualizar_status_vencidos(cursor)
-    unificar_alunos_duplicados(cursor)
-    limpar_bloqueios_antigos(cursor)
-    conn.commit()
+    manutencao_basica_segura(conn, cursor, limpar_bloqueios=True)
 
     cursor.execute("SELECT COUNT(*) AS total FROM alunos")
     total = cursor.fetchone()["total"]
@@ -1014,9 +1049,7 @@ def alunos():
     status = request.args.get("status", "").strip()
     conn = conectar()
     cursor = conn.cursor()
-    atualizar_status_vencidos(cursor)
-    unificar_alunos_duplicados(cursor)
-    conn.commit()
+    manutencao_basica_segura(conn, cursor)
 
     if busca and status:
         cursor.execute(
@@ -1043,7 +1076,8 @@ def alunos():
         alunos=alunos,
         busca=busca,
         status=status,
-        calcular_idade=calcular_idade
+        calcular_idade=calcular_idade,
+        formatar_data_brasil=formatar_data_brasil
     )
 
 
