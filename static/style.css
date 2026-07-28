@@ -310,6 +310,25 @@ tr:hover td {
     align-self: end;
 }
 
+.backup-actions {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.backup-actions form {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.backup-actions input {
+    margin: 0;
+    max-width: 320px;
+}
+
 .bloqueios-lista {
     margin-top: 14px;
 }
@@ -432,6 +451,16 @@ tr:hover td {
 
     .actions, .footer-actions, .busca-box {
         flex-direction: column;
+    }
+
+    .backup-actions, .backup-actions form {
+        align-items: stretch;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .backup-actions input {
+        max-width: none;
     }
 
     .admin-agendar-form {

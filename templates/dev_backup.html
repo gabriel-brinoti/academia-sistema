@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Backup - DL Fit</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icon-180.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+    <meta name="theme-color" content="#111111">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="navbar">
+    <div class="navbar-brand">
+        <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
+        <h1>DL FIT - Backup</h1>
+    </div>
+    <div class="navbar-links">
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('logout') }}">Sair</a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="admin-panel">
+        <h2>Backup do sistema</h2>
+        <p class="subtitulo">Rota oculta para uso tecnico. Baixe uma copia em Excel antes de trocar banco ou fazer ajustes grandes.</p>
+
+        <div class="backup-actions">
+            <a class="btn" href="{{ url_for('baixar_backup') }}">Baixar backup em Excel</a>
+
+            <form method="POST" action="{{ url_for('restaurar_backup') }}" enctype="multipart/form-data"
+                  onsubmit="return confirm('Restaurar este backup vai substituir os dados atuais do sistema. Deseja continuar?')">
+                <input type="file" name="arquivo_backup" accept=".xlsx" required>
+                <button type="submit" class="btn-danger">Restaurar backup</button>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

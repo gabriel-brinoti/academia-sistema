@@ -1,10 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, send_file
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pandas as pd
 import unicodedata
 from datetime import datetime, date, timedelta
+from io import BytesIO
 
 app = Flask(__name__)
 app.secret_key = "academia_secret"
@@ -181,6 +182,57 @@ def unificar_alunos_duplicados(cursor):
     for alunos in grupos.values():
         if len(alunos) > 1:
             unir_grupo_alunos_duplicados(cursor, alunos)
+
+
+TABELAS_BACKUP = {
+    "alunos": [
+        "id", "nome", "telefone", "plano", "vencimento", "status_pagamento",
+        "observacao", "aulas_restantes", "usuario", "senha", "data_nascimento",
+        "data_inicio", "aulas_contratadas", "aceitou_contrato",
+        "data_aceite_contrato", "frequencia", "limite_diario",
+        "aulas_usadas_iniciais"
+    ],
+    "aulas": ["id", "dia_semana", "horario", "modalidade", "capacidade"],
+    "agendamentos": ["id", "aluno_id", "aula_id", "data_agendamento"],
+    "bloqueios_aulas": [
+        "data_bloqueio", "horario_inicio", "horario_fim", "tipo", "motivo"
+    ],
+}
+
+
+def valor_backup(valor):
+    if pd.isna(valor):
+        return None
+    if isinstance(valor, pd.Timestamp):
+        if valor.time() == datetime.min.time():
+            return valor.strftime("%Y-%m-%d")
+        return valor.strftime("%Y-%m-%d %H:%M:%S")
+    return valor
+
+
+def inserir_linhas_backup(cursor, tabela, colunas, linhas):
+    colunas_sql = ", ".join(colunas)
+    placeholders = ", ".join(["%s"] * len(colunas))
+
+    for _, linha in linhas.iterrows():
+        valores = [valor_backup(linha.get(coluna)) for coluna in colunas]
+        cursor.execute(
+            f"INSERT INTO {tabela} ({colunas_sql}) VALUES ({placeholders})",
+            valores
+        )
+
+
+def resetar_sequence(cursor, tabela):
+    if tabela not in ("alunos", "aulas", "agendamentos"):
+        return
+
+    cursor.execute(f"""
+        SELECT setval(
+            pg_get_serial_sequence('{tabela}', 'id'),
+            COALESCE((SELECT MAX(id) FROM {tabela}), 1),
+            (SELECT COUNT(*) > 0 FROM {tabela})
+        )
+    """)
 
 
 def limite_plano(plano, aulas_contratadas=None):
@@ -796,6 +848,90 @@ def dashboard():
         bloqueios_aulas=bloqueios_aulas,
         data_padrao_bloqueio=obter_data_base().strftime("%Y-%m-%d")
     )
+
+
+@app.route("/dev-backup-dlfit")
+def dev_backup():
+    if "admin_logado" not in session:
+        return redirect(url_for("login"))
+
+    return render_template("dev_backup.html")
+
+
+@app.route("/baixar_backup")
+def baixar_backup():
+    if "admin_logado" not in session:
+        return redirect(url_for("login"))
+
+    conn = conectar()
+    cursor = conn.cursor()
+    atualizar_status_vencidos(cursor)
+    unificar_alunos_duplicados(cursor)
+    limpar_bloqueios_antigos(cursor)
+    conn.commit()
+
+    arquivo = BytesIO()
+    with pd.ExcelWriter(arquivo, engine="openpyxl") as writer:
+        for tabela, colunas in TABELAS_BACKUP.items():
+            cursor.execute(f"SELECT {', '.join(colunas)} FROM {tabela}")
+            dados = cursor.fetchall()
+            df = pd.DataFrame(dados, columns=colunas)
+            df.to_excel(writer, sheet_name=tabela, index=False)
+
+    conn.close()
+    arquivo.seek(0)
+
+    nome_arquivo = f"backup_dlfit_{data_hoje_brasil().strftime('%Y-%m-%d')}.xlsx"
+    return send_file(
+        arquivo,
+        as_attachment=True,
+        download_name=nome_arquivo,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+@app.route("/restaurar_backup", methods=["POST"])
+def restaurar_backup():
+    if "admin_logado" not in session:
+        return redirect(url_for("login"))
+
+    arquivo = request.files.get("arquivo_backup")
+    if not arquivo or arquivo.filename == "":
+        return redirect(url_for("dashboard"))
+
+    try:
+        abas = pd.read_excel(arquivo, sheet_name=None, engine="openpyxl")
+        conn = conectar()
+        cursor = conn.cursor()
+
+        cursor.execute("DELETE FROM agendamentos")
+        cursor.execute("DELETE FROM bloqueios_aulas")
+        cursor.execute("DELETE FROM aulas")
+        cursor.execute("DELETE FROM alunos")
+
+        for tabela in ("alunos", "aulas", "agendamentos", "bloqueios_aulas"):
+            if tabela not in abas:
+                continue
+
+            df = abas[tabela]
+            colunas = [
+                coluna for coluna in TABELAS_BACKUP[tabela]
+                if coluna in df.columns
+            ]
+            if colunas:
+                inserir_linhas_backup(cursor, tabela, colunas, df)
+
+        for tabela in ("alunos", "aulas", "agendamentos"):
+            resetar_sequence(cursor, tabela)
+
+        atualizar_status_vencidos(cursor)
+        unificar_alunos_duplicados(cursor)
+        conn.commit()
+        conn.close()
+    except Exception:
+        return redirect(url_for("dashboard"))
+
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/bloqueio_aulas", methods=["POST"])
