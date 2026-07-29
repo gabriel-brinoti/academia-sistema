@@ -343,6 +343,22 @@ def obter_aulas_contratadas_form(data_inicio, vencimento, frequencia):
     return aulas_contratadas
 
 
+def limite_aluno(aluno):
+    aulas_contratadas = aluno.get("aulas_contratadas")
+    if aulas_contratadas:
+        return int(aulas_contratadas)
+
+    aulas_auto = calcular_aulas_contratadas_auto(
+        aluno.get("data_inicio"),
+        aluno.get("vencimento"),
+        aluno.get("frequencia")
+    )
+    if aulas_auto:
+        return aulas_auto
+
+    return limite_plano(aluno.get("plano"))
+
+
 def contar_aulas_usadas(cursor, aluno_id, data_inicio=None):
     if data_inicio:
         cursor.execute("""
@@ -370,7 +386,7 @@ def resumo_aulas_mes(cursor, aluno_id, plano):
     aluno = cursor.fetchone()
     usadas_sistema = contar_aulas_usadas(cursor, aluno_id, aluno["data_inicio"])
 
-    limite = limite_plano(plano, aluno["aulas_contratadas"])
+    limite = limite_aluno(aluno)
     usadas = usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
 
     if limite >= 9999:
@@ -406,7 +422,7 @@ def montar_resumo_aulas_aluno(aluno, agendamentos):
 
         usadas_sistema += 1
 
-    limite = limite_plano(aluno.get("plano"), aluno.get("aulas_contratadas"))
+    limite = limite_aluno(aluno)
     usadas = usadas_sistema + (aluno.get("aulas_usadas_iniciais") or 0)
 
     if limite >= 9999:
@@ -1482,7 +1498,7 @@ def agendar_aula(aula_id):
     aulas_usadas_sistema = contar_aulas_usadas(cursor, aluno_id, aluno["data_inicio"])
     aulas_usadas_total = aulas_usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
 
-    limite = limite_plano(aluno["plano"], aluno["aulas_contratadas"])
+    limite = limite_aluno(aluno)
 
     if limite < 9999 and aulas_usadas_total >= limite:
         conn.close()
@@ -1645,7 +1661,7 @@ def aceitar_contrato():
 
     aulas_usadas_sistema = contar_aulas_usadas(cursor, aluno_id, aluno["data_inicio"])
 
-    limite = limite_plano(aluno["plano"], aluno["aulas_contratadas"])
+    limite = limite_aluno(aluno)
     aulas_usadas_total = aulas_usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
 
     if limite >= 9999:
