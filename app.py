@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, send_file, g, has_request_context
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -400,7 +400,12 @@ def preencher_resumo_aulas_lista(cursor, alunos):
     if not alunos:
         return
 
-    cursor.execute("SELECT aluno_id, data_agendamento FROM agendamentos")
+    ids_alunos = [aluno["id"] for aluno in alunos]
+    cursor.execute("""
+        SELECT aluno_id, data_agendamento
+        FROM agendamentos
+        WHERE aluno_id = ANY(%s)
+    """, (ids_alunos,))
     agendamentos = cursor.fetchall()
 
     for aluno in alunos:
@@ -711,8 +716,38 @@ def init_db():
 """)
     
     cursor.execute("""
-    ALTER TABLE alunos ADD COLUMN IF NOT EXISTS aulas_usadas_iniciais INTEGER DEFAULT 0
+        ALTER TABLE alunos ADD COLUMN IF NOT EXISTS aulas_usadas_iniciais INTEGER DEFAULT 0
 """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_alunos_status_pagamento
+        ON alunos (status_pagamento)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_alunos_vencimento
+        ON alunos (vencimento)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_alunos_nome
+        ON alunos (nome)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_aulas_dia_horario
+        ON aulas (dia_semana, horario)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_agendamentos_data_aula
+        ON agendamentos (data_agendamento, aula_id)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_agendamentos_aluno_data
+        ON agendamentos (aluno_id, data_agendamento)
+    """)
 
     conn.commit()
 
@@ -727,6 +762,10 @@ from datetime import datetime, timedelta
 
 
 def obter_horario_bloqueio(data_bloqueio):
+    chave_cache = f"horario_bloqueio_{data_bloqueio.strftime('%Y-%m-%d')}"
+    if has_request_context() and hasattr(g, chave_cache):
+        return getattr(g, chave_cache)
+
     conn = conectar()
     cursor = conn.cursor()
     cursor.execute("""
@@ -744,7 +783,10 @@ def obter_horario_bloqueio(data_bloqueio):
 
     for bloqueio in bloqueios_resto_dia:
         if normalizar_tipo_bloqueio(bloqueio.get("tipo")) == "TODAS":
-            return bloqueio["horario_inicio"]
+            horario = bloqueio["horario_inicio"]
+            if has_request_context():
+                setattr(g, chave_cache, horario)
+            return horario
 
     tipos = {
         normalizar_tipo_bloqueio(bloqueio.get("tipo"))
@@ -752,28 +794,48 @@ def obter_horario_bloqueio(data_bloqueio):
     }
 
     if {"AULAS", "MUSCULACAO"}.issubset(tipos):
-        return min(bloqueio["horario_inicio"] for bloqueio in bloqueios_resto_dia)
+        horario = min(bloqueio["horario_inicio"] for bloqueio in bloqueios_resto_dia)
+        if has_request_context():
+            setattr(g, chave_cache, horario)
+        return horario
 
+    if has_request_context():
+        setattr(g, chave_cache, None)
     return None
 
 
 def obter_data_base():
+    if has_request_context() and hasattr(g, "data_base_cronograma"):
+        return g.data_base_cronograma
+
     agora = datetime.utcnow() - timedelta(hours=3)
     horario_bloqueio = obter_horario_bloqueio(agora.date())
 
     if horario_bloqueio and agora.strftime("%H:%M") >= horario_bloqueio:
-        return agora.date() + timedelta(days=1)
+        data_base = agora.date() + timedelta(days=1)
+        if has_request_context():
+            g.data_base_cronograma = data_base
+        return data_base
 
     # domingo = 6 
     if   agora.weekday() == 6:
         if agora.hour >= 12:
-            return agora.date() + timedelta(days=1)
+            data_base = agora.date() + timedelta(days=1)
+            if has_request_context():
+                g.data_base_cronograma = data_base
+            return data_base
 
     else:
         if (agora.hour, agora.minute) >= (20, 45):
-            return agora.date() + timedelta(days=1)
+            data_base = agora.date() + timedelta(days=1)
+            if has_request_context():
+                g.data_base_cronograma = data_base
+            return data_base
 
-    return agora.date()
+    data_base = agora.date()
+    if has_request_context():
+        g.data_base_cronograma = data_base
+    return data_base
 
 def obter_data_cronograma_formatada():
     data_base = obter_data_base()
@@ -823,32 +885,29 @@ def listar_aulas_do_dia(dia_semana=None):
     aulas = cursor.fetchall()
     bloqueios = obter_bloqueios_aulas(cursor, hoje)
 
+    cursor.execute("""
+        SELECT 
+            ag.aula_id,
+            ag.id AS agendamento_id,
+            al.nome,
+            al.data_nascimento
+        FROM agendamentos ag
+        JOIN alunos al ON al.id = ag.aluno_id
+        WHERE ag.data_agendamento = %s
+        ORDER BY al.nome ASC
+    """, (hoje,))
+    inscritos_por_aula = {}
+    for inscrito in cursor.fetchall():
+        inscritos_por_aula.setdefault(inscrito["aula_id"], []).append({
+            "agendamento_id": inscrito["agendamento_id"],
+            "nome": inscrito["nome"],
+            "idade": calcular_idade(inscrito["data_nascimento"])
+        })
+
     dados = []
     for aula in aulas:
         ocupadas = aula["ocupadas"] or 0
         capacidade = aula["capacidade"] or 10
-
-        cursor.execute("""
-            SELECT 
-                ag.id AS agendamento_id,
-                al.nome,
-                al.data_nascimento
-            FROM agendamentos ag
-            JOIN alunos al ON al.id = ag.aluno_id
-            WHERE ag.aula_id = %s AND ag.data_agendamento = %s
-            ORDER BY al.nome ASC
-        """, (aula["id"], hoje))
-
-        inscritos_db = cursor.fetchall()
-
-        inscritos = [
-            {
-                "agendamento_id": i["agendamento_id"],
-                "nome": i["nome"],
-                "idade": calcular_idade(i["data_nascimento"])
-            }
-            for i in inscritos_db
-        ]
 
         item = dict(aula)
         item["restantes"] = max(capacidade - ocupadas, 0)
@@ -860,7 +919,7 @@ def listar_aulas_do_dia(dia_semana=None):
         item["horario_fim_bloqueio"] = bloqueio["horario_fim"] if bloqueio else None
         item["motivo_bloqueio"] = bloqueio["motivo"] if bloqueio else None
         item["tipo_bloqueio"] = bloqueio["tipo"] if bloqueio else None
-        item["inscritos"] = inscritos
+        item["inscritos"] = inscritos_por_aula.get(aula["id"], [])
         dados.append(item)
 
     conn.close()
@@ -900,7 +959,7 @@ def dashboard():
 
     conn = conectar()
     cursor = conn.cursor()
-    manutencao_basica_segura(conn, cursor, limpar_bloqueios=True)
+    manutencao_basica_segura(conn, cursor, unificar=False, limpar_bloqueios=True)
 
     cursor.execute("SELECT COUNT(*) AS total FROM alunos")
     total = cursor.fetchone()["total"]
@@ -1101,7 +1160,7 @@ def alunos():
     status = request.args.get("status", "").strip()
     conn = conectar()
     cursor = conn.cursor()
-    manutencao_basica_segura(conn, cursor)
+    manutencao_basica_segura(conn, cursor, unificar=False)
 
     if busca and status:
         cursor.execute(
@@ -1369,9 +1428,6 @@ def cronograma():
 
     conn = conectar()
     cursor = conn.cursor()
-    atualizar_status_vencidos(cursor)
-    unificar_alunos_duplicados(cursor)
-    conn.commit()
     cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
     alunos = cursor.fetchall()
     conn.close()
@@ -1396,9 +1452,6 @@ def painel_professor():
 
     conn = conectar()
     cursor = conn.cursor()
-    atualizar_status_vencidos(cursor)
-    unificar_alunos_duplicados(cursor)
-    conn.commit()
     cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
     alunos = cursor.fetchall()
     conn.close()
@@ -1424,7 +1477,6 @@ def agendar_aula(aula_id):
     conn = conectar()
     cursor = conn.cursor()
     atualizar_status_vencidos(cursor)
-    unificar_alunos_duplicados(cursor)
     conn.commit()
 
     cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
