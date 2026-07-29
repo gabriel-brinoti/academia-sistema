@@ -10,6 +10,10 @@ from io import BytesIO
 app = Flask(__name__)
 app.secret_key = "academia_secret"
 
+# Funcao extra ja pronta para venda futura.
+# Para liberar o bloqueio de aulas por fechamento especial, trocar para True.
+BLOQUEIO_AULAS_ATIVO = False
+
 
 def conectar():
     database_url = os.getenv("DATABASE_URL")
@@ -63,6 +67,9 @@ def atualizar_status_vencidos(cursor):
 
 
 def limpar_bloqueios_antigos(cursor):
+    if not BLOQUEIO_AULAS_ATIVO:
+        return
+
     hoje = data_hoje_brasil().strftime("%Y-%m-%d")
     cursor.execute("""
         DELETE FROM bloqueios_aulas
@@ -568,6 +575,9 @@ def normalizar_tipo_bloqueio(tipo):
 
 
 def obter_bloqueios_aulas(cursor, data_agendamento):
+    if not BLOQUEIO_AULAS_ATIVO:
+        return []
+
     cursor.execute("""
         SELECT data_bloqueio, horario_inicio, horario_fim, motivo, tipo
         FROM bloqueios_aulas
@@ -762,6 +772,9 @@ from datetime import datetime, timedelta
 
 
 def obter_horario_bloqueio(data_bloqueio):
+    if not BLOQUEIO_AULAS_ATIVO:
+        return None
+
     chave_cache = f"horario_bloqueio_{data_bloqueio.strftime('%Y-%m-%d')}"
     if has_request_context() and hasattr(g, chave_cache):
         return getattr(g, chave_cache)
@@ -998,6 +1011,7 @@ def dashboard():
         dia_atual=dia_atual,
         aulas_hoje=aulas_hoje,
         bloqueios_aulas=bloqueios_aulas,
+        bloqueio_aulas_ativo=BLOQUEIO_AULAS_ATIVO,
         data_padrao_bloqueio=obter_data_base().strftime("%Y-%m-%d")
     )
 
@@ -1104,6 +1118,9 @@ def bloqueio_aulas():
     if "admin_logado" not in session:
         return redirect(url_for("login"))
 
+    if not BLOQUEIO_AULAS_ATIVO:
+        return redirect(url_for("dashboard"))
+
     data_bloqueio = request.form.get("data_bloqueio", "")
     horario_inicio = request.form.get("horario_inicio", "")
     horario_fim = request.form.get("horario_fim", "")
@@ -1138,6 +1155,9 @@ def bloqueio_aulas():
 def remover_bloqueio_aulas(data_bloqueio, tipo):
     if "admin_logado" not in session:
         return redirect(url_for("login"))
+
+    if not BLOQUEIO_AULAS_ATIVO:
+        return redirect(url_for("dashboard"))
 
     conn = conectar()
     cursor = conn.cursor()

@@ -48,6 +48,7 @@
         <a class="card card-link" href="{{ url_for('alunos', status='Atrasado') }}"><p>Atrasados</p><h2>{{ atrasados }}</h2></a>
     </div>
 
+    {% if bloqueio_aulas_ativo %}
     <div class="admin-panel">
         <h3>Bloquear aulas por fechamento especial</h3>
         <p class="subtitulo">Use "Bloquear ate" apenas quando o fechamento tiver hora para terminar. Se deixar vazio, bloqueia ate o fim do dia.</p>
@@ -115,6 +116,7 @@
         </div>
         {% endif %}
     </div>
+    {% endif %}
 
     <h2 class="schedule-title">Cronograma do Dia</h2>
 
