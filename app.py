@@ -517,7 +517,7 @@ def montar_aulas_padrao():
 
         ("Sexta-feira", "05:00", "LEG WORK", 7),
         ("Sexta-feira", "07:00", "FLEX FIT", 7),
-        ("Sexta-feira", "08:00", "ACROYOGA", 7),
+        ("Sexta-feira", "08:00", "LEG WORK", 7),
         ("Sexta-feira", "17:00", "CROSS FIGHT", 7),
         ("Sexta-feira", "18:00", "SPIN FIT", 7),
     ])
@@ -870,12 +870,15 @@ def obter_dia_semana():
     return mapa[data_base.weekday()]
 
 
-def listar_aulas_do_dia(dia_semana=None):
+def listar_aulas_do_dia(dia_semana=None, cursor=None):
     if not dia_semana:
         dia_semana = obter_dia_semana()
 
-    conn = conectar()
-    cursor = conn.cursor()
+    conn = None
+    if cursor is None:
+        conn = conectar()
+        cursor = conn.cursor()
+
     data_base = obter_data_base()
     hoje = data_base.strftime("%Y-%m-%d")
 
@@ -935,7 +938,8 @@ def listar_aulas_do_dia(dia_semana=None):
         item["inscritos"] = inscritos_por_aula.get(aula["id"], [])
         dados.append(item)
 
-    conn.close()
+    if conn:
+        conn.close()
     return dia_semana, dados
 
 
@@ -974,31 +978,35 @@ def dashboard():
     cursor = conn.cursor()
     manutencao_basica_segura(conn, cursor, unificar=False, limpar_bloqueios=True)
 
-    cursor.execute("SELECT COUNT(*) AS total FROM alunos")
-    total = cursor.fetchone()["total"]
+    cursor.execute("""
+        SELECT
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE status_pagamento = 'Pago') AS pagos,
+            COUNT(*) FILTER (WHERE status_pagamento = 'Pendente') AS pendentes,
+            COUNT(*) FILTER (WHERE status_pagamento = 'Atrasado') AS atrasados
+        FROM alunos
+    """)
+    resumo = cursor.fetchone()
+    total = resumo["total"]
+    pagos = resumo["pagos"]
+    pendentes = resumo["pendentes"]
+    atrasados = resumo["atrasados"]
 
-    cursor.execute("SELECT COUNT(*) AS total FROM alunos WHERE status_pagamento = 'Pago'")
-    pagos = cursor.fetchone()["total"]
-
-    cursor.execute("SELECT COUNT(*) AS total FROM alunos WHERE status_pagamento = 'Pendente'")
-    pendentes = cursor.fetchone()["total"]
-
-    cursor.execute("SELECT COUNT(*) AS total FROM alunos WHERE status_pagamento = 'Atrasado'")
-    atrasados = cursor.fetchone()["total"]
-
-    cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
+    cursor.execute("SELECT id, nome FROM alunos ORDER BY nome ASC")
     alunos = cursor.fetchall()
 
-    cursor.execute("""
-        SELECT data_bloqueio, horario_inicio, horario_fim, motivo, tipo
-        FROM bloqueios_aulas
-        WHERE data_bloqueio >= %s
-        ORDER BY data_bloqueio ASC, horario_inicio ASC, tipo ASC
-        LIMIT 10
-    """, (data_hoje_brasil().strftime("%Y-%m-%d"),))
-    bloqueios_aulas = cursor.fetchall()
+    bloqueios_aulas = []
+    if BLOQUEIO_AULAS_ATIVO:
+        cursor.execute("""
+            SELECT data_bloqueio, horario_inicio, horario_fim, motivo, tipo
+            FROM bloqueios_aulas
+            WHERE data_bloqueio >= %s
+            ORDER BY data_bloqueio ASC, horario_inicio ASC, tipo ASC
+            LIMIT 10
+        """, (data_hoje_brasil().strftime("%Y-%m-%d"),))
+        bloqueios_aulas = cursor.fetchall()
 
-    dia_atual, aulas_hoje = listar_aulas_do_dia()
+    dia_atual, aulas_hoje = listar_aulas_do_dia(cursor=cursor)
     conn.close()
 
     return render_template(
@@ -1443,12 +1451,12 @@ def importar_excel():
 
 @app.route("/cronograma")
 def cronograma():
-    dia_atual, aulas_hoje = listar_aulas_do_dia()
-    data_cronograma = obter_data_cronograma_formatada()
-
     conn = conectar()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
+    dia_atual, aulas_hoje = listar_aulas_do_dia(cursor=cursor)
+    data_cronograma = obter_data_cronograma_formatada()
+
+    cursor.execute("SELECT id, nome FROM alunos ORDER BY nome ASC")
     alunos = cursor.fetchall()
     conn.close()
 
@@ -1467,12 +1475,12 @@ def painel_professor():
     if "admin_logado" not in session and "professor_liberado" not in session:
         return redirect(url_for("cronograma"))
 
-    dia_atual, aulas_hoje = listar_aulas_do_dia()
-    data_cronograma = obter_data_cronograma_formatada()
-
     conn = conectar()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
+    dia_atual, aulas_hoje = listar_aulas_do_dia(cursor=cursor)
+    data_cronograma = obter_data_cronograma_formatada()
+
+    cursor.execute("SELECT id, nome FROM alunos ORDER BY nome ASC")
     alunos = cursor.fetchall()
     conn.close()
 
@@ -1496,15 +1504,26 @@ def agendar_aula(aula_id):
 
     conn = conectar()
     cursor = conn.cursor()
-    atualizar_status_vencidos(cursor)
-    conn.commit()
 
-    cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
     nome_normalizado = normalizar_nome(nome_digitado)
+    cursor.execute("""
+        SELECT *
+        FROM alunos
+        WHERE nome ILIKE %s
+        ORDER BY id DESC
+        LIMIT 5
+    """, (nome_digitado,))
     aluno = next(
         (item for item in cursor.fetchall() if normalizar_nome(item["nome"]) == nome_normalizado),
         None
     )
+
+    if not aluno:
+        cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
+        aluno = next(
+            (item for item in cursor.fetchall() if normalizar_nome(item["nome"]) == nome_normalizado),
+            None
+        )
 
     if not aluno:
         conn.close()
@@ -1516,7 +1535,18 @@ def agendar_aula(aula_id):
 
     aluno_id = aluno["id"]
 
-    
+    vencimento_aluno = texto_ordenavel(aluno.get("vencimento"))
+    if (
+        vencimento_aluno
+        and vencimento_aluno < data_hoje_brasil().strftime("%Y-%m-%d")
+        and aluno["status_pagamento"] != "Atrasado"
+    ):
+        cursor.execute(
+            "UPDATE alunos SET status_pagamento = 'Atrasado' WHERE id = %s",
+            (aluno_id,)
+        )
+        conn.commit()
+        aluno["status_pagamento"] = "Atrasado"
 
     # buscar aula
     cursor.execute("SELECT * FROM aulas WHERE id = %s", (aula_id,))
