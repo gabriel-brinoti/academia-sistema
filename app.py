@@ -380,6 +380,42 @@ def resumo_aulas_mes(cursor, aluno_id, plano):
     return f"{usadas} / {limite} usadas - restam {restantes}"
 
 
+def preencher_resumo_aulas_lista(cursor, alunos):
+    if not alunos:
+        return
+
+    cursor.execute("SELECT aluno_id, data_agendamento FROM agendamentos")
+    agendamentos = cursor.fetchall()
+
+    for aluno in alunos:
+        aluno["resumo_aulas"] = montar_resumo_aulas_aluno(aluno, agendamentos)
+
+
+def montar_resumo_aulas_aluno(aluno, agendamentos):
+    aluno_id = aluno["id"]
+    data_inicio = texto_ordenavel(aluno.get("data_inicio"))
+    usadas_sistema = 0
+
+    for agendamento in agendamentos:
+        if agendamento.get("aluno_id") != aluno_id:
+            continue
+
+        data_agendamento = texto_ordenavel(agendamento.get("data_agendamento"))
+        if data_inicio and data_agendamento < data_inicio:
+            continue
+
+        usadas_sistema += 1
+
+    limite = limite_plano(aluno.get("plano"), aluno.get("aulas_contratadas"))
+    usadas = usadas_sistema + (aluno.get("aulas_usadas_iniciais") or 0)
+
+    if limite >= 9999:
+        return f"{usadas} / ilimitado"
+
+    restantes = max(limite - usadas, 0)
+    return f"{usadas} / {limite} usadas - restam {restantes}"
+
+
 def calcular_idade(data_nascimento):
     if not data_nascimento:
         return None
@@ -1067,8 +1103,7 @@ def alunos():
         cursor.execute("SELECT * FROM alunos ORDER BY nome ASC")
         alunos = cursor.fetchall()
 
-    for aluno in alunos:
-        aluno["resumo_aulas"] = resumo_aulas_mes(cursor, aluno["id"], aluno["plano"])
+    preencher_resumo_aulas_lista(cursor, alunos)
 
     conn.close()
     return render_template(
