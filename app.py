@@ -479,14 +479,14 @@ def montar_aulas_padrao():
         ("Segunda-feira", "09:00", "NEOPILATES", 7),
         ("Segunda-feira", "17:00", "ACROYOGA", 7),
         ("Segunda-feira", "18:00", "NEOPILATES", 7),
-        ("Segunda-feira", "18:00", "SPIN FIT", 7),
+        ("Segunda-feira", "18:00", "SPIN FIT", 5),
         ("Segunda-feira", "19:00", "CIRCO", 7),
         ("Segunda-feira", "19:00", "DL HYBRID", 7),
         ("Segunda-feira", "20:00", "ACROYOGA", 7),
 
         ("Terca-feira", "05:00", "NEOPILATES", 7),
         ("Terca-feira", "07:00", "CIRCO", 7),
-        ("Terca-feira", "07:00", "SPIN FIT", 7),
+        ("Terca-feira", "07:00", "SPIN FIT", 5),
         ("Terca-feira", "09:00", "NEOKIDS", 7),
         ("Terca-feira", "16:00", "NEOKIDS", 7),
         ("Terca-feira", "17:00", "NEOPILATES", 7),
@@ -499,14 +499,14 @@ def montar_aulas_padrao():
         ("Quarta-feira", "08:00", "ACROYOGA", 7),
         ("Quarta-feira", "17:00", "ACROYOGA", 7),
         ("Quarta-feira", "18:00", "NEOPILATES", 7),
-        ("Quarta-feira", "18:00", "SPIN FIT", 7),
+        ("Quarta-feira", "18:00", "SPIN FIT", 5),
         ("Quarta-feira", "19:00", "CIRCO", 7),
         ("Quarta-feira", "19:00", "FULL WORK", 7),
         ("Quarta-feira", "20:00", "ACROYOGA", 7),
 
         ("Quinta-feira", "05:00", "NEOPILATES", 7),
         ("Quinta-feira", "07:00", "CIRCO", 7),
-        ("Quinta-feira", "07:00", "SPIN FIT", 7),
+        ("Quinta-feira", "07:00", "SPIN FIT", 5),
         ("Quinta-feira", "08:00", "C.FIGHT", 7),
         ("Quinta-feira", "09:00", "NEOKIDS", 7),
         ("Quinta-feira", "16:00", "NEOKIDS", 7),
@@ -520,7 +520,7 @@ def montar_aulas_padrao():
         ("Sexta-feira", "07:00", "FLEX FIT", 7),
         ("Sexta-feira", "08:00", "LEG WORK", 7),
         ("Sexta-feira", "17:00", "CROSS FIGHT", 7),
-        ("Sexta-feira", "18:00", "SPIN FIT", 7),
+        ("Sexta-feira", "18:00", "SPIN FIT", 5),
     ])
 
     return aulas
