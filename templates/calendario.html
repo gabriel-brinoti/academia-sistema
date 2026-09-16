@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendario - DL Fit</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icon-180.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+    <meta name="theme-color" content="#111111">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="navbar">
+    <div class="navbar-brand">
+        <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
+        <h1>DL FIT - ADM</h1>
+    </div>
+    <div class="navbar-links">
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('alunos') }}">Alunos</a>
+        <a href="{{ url_for('logout') }}">Sair</a>
+    </div>
+</div>
+
+<main class="container calendar-page">
+    <div class="calendar-page-heading">
+        <div>
+            <h2 class="section-title">Calendario</h2>
+            <p class="subtitulo">Consulte o movimento, as anotacoes e os bloqueios por dia.</p>
+        </div>
+        <a class="btn" href="{{ url_for('dashboard') }}">Voltar ao dashboard</a>
+    </div>
+
+    <section class="calendar-panel" aria-labelledby="calendar-title">
+        <div class="calendar-header">
+            <h3 id="calendar-title">Calendario</h3>
+            <div class="calendar-controls">
+                <button type="button" class="calendar-nav" id="calendar-prev" aria-label="Mes anterior">&lt;</button>
+                <strong id="calendar-month-label">Carregando...</strong>
+                <button type="button" class="calendar-nav" id="calendar-next" aria-label="Proximo mes">&gt;</button>
+                <button type="button" class="calendar-today" id="calendar-today">Hoje</button>
+            </div>
+        </div>
+        <div id="calendar-status" class="calendar-status" role="status"></div>
+        <div class="calendar-weekdays" aria-hidden="true">
+            <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
+        </div>
+        <div id="calendar-grid" class="calendar-grid" role="grid" aria-label="Dias do mes"></div>
+        <div class="calendar-legend">
+            <span><i class="calendar-dot note-dot"></i>Anotacao</span>
+            <span><i class="calendar-dot block-dot"></i>Bloqueio</span>
+        </div>
+    </section>
+
+    <section class="calendar-day-details calendar-selection" id="calendar-day-details" aria-live="polite">
+        <div class="calendar-details-empty">Selecione uma data para consultar o resumo.</div>
+    </section>
+</main>
+
+<script>
+(() => {
+    const grid = document.getElementById('calendar-grid');
+    const label = document.getElementById('calendar-month-label');
+    const status = document.getElementById('calendar-status');
+    const details = document.getElementById('calendar-day-details');
+    const monthNames = [
+        'Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    const today = new Date();
+    let viewedMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    let selectedDate = '';
+    let monthMetrics = new Map();
+
+    function isoDate(year, month, day) {
+        return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+
+    function formatDate(date) {
+        const [year, month, day] = date.split('-');
+        return `${day}/${month}/${year}`;
+    }
+
+    function makeElement(tag, className, text) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        if (text !== undefined && text !== null) element.textContent = text;
+        return element;
+    }
+
+    async function fetchJson(url, options = {}) {
+        const response = await fetch(url, { credentials: 'same-origin', ...options });
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.toLowerCase().includes('application/json')) {
+            if (response.redirected || response.url.includes('/login')) {
+                throw new Error('Sua sessao expirou. Entre novamente no sistema.');
+            }
+            throw new Error('O servidor retornou uma resposta invalida. Atualize a pagina e tente novamente.');
+        }
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+            throw new Error(data.erro || 'Nao foi possivel concluir a solicitacao.');
+        }
+        return data;
+    }
+
+    function formatDateTime(value) {
+        if (!value) return '';
+        const parts = String(value).split(' ');
+        if (parts.length < 2) return String(value);
+        return `${formatDate(parts[0])} as ${parts[1].slice(0, 5)}`;
+    }
+
+    function resetDetails(text) {
+        details.innerHTML = '';
+        details.appendChild(makeElement('div', 'calendar-details-empty', text));
+    }
+
+    function summaryBoxes(metric) {
+        const totals = makeElement('div', 'calendar-details-totals');
+        totals.appendChild(makeElement('div', 'calendar-total-box', `${metric.unique_students || 0}\nAlunos unicos`));
+        totals.appendChild(makeElement('div', 'calendar-total-box', `${metric.active_bookings || 0}\nInscricoes ativas`));
+        totals.appendChild(makeElement('div', 'calendar-total-box', `${metric.cancelled_bookings || 0}\nCancelamentos`));
+        return totals;
+    }
+
+    function renderSelectedDay(date) {
+        const metric = monthMetrics.get(date) || {};
+        details.innerHTML = '';
+        const header = makeElement('div', 'calendar-details-header');
+        header.appendChild(makeElement('h4', '', formatDate(date)));
+        header.appendChild(summaryBoxes(metric));
+        details.appendChild(header);
+
+        const button = makeElement('button', 'calendar-details-button', 'Ver detalhes do dia');
+        button.type = 'button';
+        button.addEventListener('click', () => loadDayDetails(date));
+        details.appendChild(button);
+    }
+
+    function renderNoteForm(date, note) {
+        const form = makeElement('form', 'calendar-note-form');
+        form.dataset.noteId = note ? note.id : '';
+        const title = makeElement('input', '');
+        title.type = 'text';
+        title.name = 'title';
+        title.placeholder = 'Titulo da anotacao';
+        title.value = note ? note.title : '';
+        title.required = true;
+        const description = makeElement('textarea', '');
+        description.name = 'description';
+        description.placeholder = 'Escreva a anotacao do dia';
+        description.rows = 4;
+        description.value = note ? (note.description || '') : '';
+        const actions = makeElement('div', 'calendar-note-form-actions');
+        const save = makeElement('button', '', note ? 'Salvar' : 'Criar anotacao');
+        save.type = 'submit';
+        actions.appendChild(save);
+        const cancel = makeElement('button', 'calendar-note-cancel', 'Cancelar');
+        cancel.type = 'button';
+        cancel.addEventListener('click', () => loadDayDetails(date));
+        actions.appendChild(cancel);
+        form.appendChild(title);
+        form.appendChild(description);
+        form.appendChild(actions);
+        form.addEventListener('submit', (event) => saveNote(event, date));
+        return form;
+    }
+
+    function renderNotes(date, notes) {
+        const section = makeElement('section', 'calendar-notes-section');
+        section.appendChild(makeElement('h4', '', 'Anotacoes'));
+        const list = makeElement('div', 'calendar-notes-list');
+        if (!notes.length) {
+            list.appendChild(makeElement('div', 'calendar-details-empty', 'Nenhuma anotacao para esta data.'));
+        }
+        notes.forEach((note) => {
+            const item = makeElement('article', 'calendar-note-item');
+            item.appendChild(makeElement('strong', '', note.title));
+            const description = makeElement('p', 'calendar-note-description', note.description || '');
+            item.appendChild(description);
+            if ((note.description || '').length > 260) {
+                description.classList.add('calendar-note-collapsed');
+                const toggle = makeElement('button', 'calendar-note-toggle', 'Ver mais');
+                toggle.type = 'button';
+                toggle.addEventListener('click', () => {
+                    const collapsed = description.classList.toggle('calendar-note-collapsed');
+                    toggle.textContent = collapsed ? 'Ver mais' : 'Ver menos';
+                });
+                item.appendChild(toggle);
+            }
+            item.appendChild(makeElement('small', '', note.updated_at ? `Atualizada ${formatDateTime(note.updated_at)}` : ''));
+            const actions = makeElement('div', 'calendar-note-actions');
+            const edit = makeElement('button', '', 'Editar');
+            edit.type = 'button';
+            edit.addEventListener('click', () => item.replaceChildren(renderNoteForm(date, note)));
+            const remove = makeElement('button', 'calendar-note-delete', 'Excluir');
+            remove.type = 'button';
+            remove.addEventListener('click', () => deleteNote(note.id, date));
+            actions.appendChild(edit);
+            actions.appendChild(remove);
+            item.appendChild(actions);
+            list.appendChild(item);
+        });
+        section.appendChild(list);
+        const create = makeElement('button', 'calendar-note-new', '+ Nova anotacao');
+        create.type = 'button';
+        create.addEventListener('click', () => create.replaceWith(renderNoteForm(date)));
+        section.appendChild(create);
+        return section;
+    }
+
+    function blockTypeLabel(block) {
+        if (block.tipo === 'MUSCULACAO') return 'Musculacao';
+        if (block.tipo === 'MODALIDADE') return block.modalidade || 'Aula especifica';
+        if (block.tipo === 'AULAS') return 'Aulas';
+        return 'Todas';
+    }
+
+    function blockPeriodText(block) {
+        if (block.tipo === 'MODALIDADE') return `as ${block.horario_inicio}`;
+        if (block.horario_fim) return `de ${block.horario_inicio} ate ${block.horario_fim}`;
+        return `de ${block.horario_inicio} ate o fim do dia`;
+    }
+
+    function renderBlocks(blocks) {
+        if (!blocks.length) return null;
+        const section = makeElement('section', 'calendar-blocks-section');
+        section.appendChild(makeElement('h4', '', 'Bloqueio ativo'));
+        blocks.forEach((block) => {
+            const item = makeElement('div', 'calendar-block-item');
+            item.appendChild(makeElement('strong', '', `${blockTypeLabel(block)} - ${blockPeriodText(block)}`));
+            if (block.motivo) item.appendChild(makeElement('p', '', `Motivo: ${block.motivo}`));
+            section.appendChild(item);
+        });
+        return section;
+    }
+
+    function renderFullDetails(history, notes, blocks) {
+        details.innerHTML = '';
+        const header = makeElement('div', 'calendar-details-header');
+        header.appendChild(makeElement('h4', '', `Detalhes - ${formatDate(history.date)}`));
+        header.appendChild(summaryBoxes(history.summary || {}));
+        details.appendChild(header);
+        const blockSection = renderBlocks(blocks || []);
+        if (blockSection) details.appendChild(blockSection);
+        const classes = history.classes || [];
+        if (!classes.length) {
+            details.appendChild(makeElement('div', 'calendar-details-empty', 'Nenhum agendamento encontrado para esta data.'));
+        } else {
+            const list = makeElement('div', 'calendar-classes-list');
+            classes.forEach((aula) => {
+                const item = makeElement('article', 'calendar-class-item');
+                const title = makeElement('div', 'calendar-class-title');
+                title.appendChild(makeElement('strong', '', `${aula.modalidade} - ${aula.horario}`));
+                title.appendChild(makeElement('span', '', `${aula.active_count || 0} ativos - ${aula.cancelled_count || 0} cancelados`));
+                item.appendChild(title);
+                const students = aula.students || [];
+                if (!students.length) {
+                    item.appendChild(makeElement('p', 'calendar-details-empty', 'Nenhum aluno registrado nesta aula.'));
+                } else {
+                    const studentList = makeElement('ul', 'calendar-students-list');
+                    students.forEach((student) => {
+                        const row = makeElement('li', student.status === 'CANCELADO' ? 'student-cancelled' : '');
+                        const age = student.idade === null || student.idade === undefined ? 'idade nao informada' : `${student.idade} anos`;
+                        row.appendChild(makeElement('span', '', `${student.nome} - ${age}`));
+                        row.appendChild(makeElement('em', '', student.status === 'CANCELADO' ? 'Cancelado' : 'Ativo'));
+                        studentList.appendChild(row);
+                    });
+                    item.appendChild(studentList);
+                }
+                list.appendChild(item);
+            });
+            details.appendChild(list);
+        }
+        details.appendChild(renderNotes(history.date, notes));
+    }
+
+    async function loadDayDetails(date) {
+        resetDetails('Carregando detalhes do dia...');
+        try {
+            const [history, notes, blocks] = await Promise.all([
+                fetchJson(`/calendar_history?date=${date}`),
+                fetchJson(`/calendar_notes?date=${date}`),
+                fetchJson(`/calendar_blocks?date=${date}`)
+            ]);
+            renderFullDetails(history, notes.notes || [], blocks.blocks || []);
+        } catch (error) {
+            resetDetails(error.message);
+        }
+    }
+
+    async function saveNote(event, date) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const noteId = form.dataset.noteId;
+        const submit = form.querySelector('button[type="submit"]');
+        submit.disabled = true;
+        submit.textContent = 'Salvando...';
+        try {
+            await fetchJson(noteId ? `/calendar_notes/${noteId}` : '/calendar_notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    date,
+                    title: form.elements.title.value,
+                    description: form.elements.description.value
+                })
+            });
+            await loadMonth();
+            await loadDayDetails(date);
+        } catch (error) {
+            alert(error.message);
+            submit.disabled = false;
+            submit.textContent = noteId ? 'Salvar' : 'Criar anotacao';
+        }
+    }
+
+    async function deleteNote(noteId, date) {
+        if (!confirm('Excluir esta anotacao?')) return;
+        try {
+            await fetchJson(`/calendar_notes/${noteId}/delete`, { method: 'POST' });
+            await loadMonth();
+            await loadDayDetails(date);
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    function renderCalendar(days) {
+        monthMetrics = new Map(days.map((day) => [day.date, day]));
+        const year = viewedMonth.getFullYear();
+        const month = viewedMonth.getMonth();
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        const todayKey = isoDate(today.getFullYear(), today.getMonth(), today.getDate());
+        label.textContent = `${monthNames[month]} ${year}`;
+        grid.innerHTML = '';
+        for (let index = 0; index < firstDay; index += 1) {
+            const empty = makeElement('span', 'calendar-day calendar-day-empty');
+            empty.setAttribute('aria-hidden', 'true');
+            grid.appendChild(empty);
+        }
+        for (let day = 1; day <= lastDay; day += 1) {
+            const date = isoDate(year, month, day);
+            const metric = monthMetrics.get(date) || {};
+            const button = makeElement('button', 'calendar-day', day);
+            button.type = 'button';
+            button.setAttribute('role', 'gridcell');
+            button.setAttribute('aria-label', `${day} de ${monthNames[month]} de ${year}`);
+            if (date === todayKey) button.classList.add('calendar-day-today');
+            if (date === selectedDate) button.classList.add('calendar-day-selected');
+            if (metric.has_notes) button.classList.add('calendar-day-note');
+            if (metric.is_blocked) button.classList.add('calendar-day-blocked');
+            button.addEventListener('click', () => {
+                selectedDate = date;
+                renderCalendar(days);
+                renderSelectedDay(date);
+            });
+            grid.appendChild(button);
+        }
+    }
+
+    async function loadMonth() {
+        const year = viewedMonth.getFullYear();
+        const month = viewedMonth.getMonth() + 1;
+        status.textContent = 'Carregando calendario...';
+        try {
+            const data = await fetchJson(`/calendar_summary?year=${year}&month=${month}`);
+            renderCalendar(data.days || []);
+            status.textContent = '';
+        } catch (error) {
+            grid.innerHTML = '';
+            status.textContent = error.message;
+            label.textContent = `${monthNames[viewedMonth.getMonth()]} ${viewedMonth.getFullYear()}`;
+        }
+    }
+
+    document.getElementById('calendar-prev').addEventListener('click', () => {
+        viewedMonth = new Date(viewedMonth.getFullYear(), viewedMonth.getMonth() - 1, 1);
+        selectedDate = '';
+        resetDetails('Selecione uma data para consultar o resumo.');
+        loadMonth();
+    });
+    document.getElementById('calendar-next').addEventListener('click', () => {
+        viewedMonth = new Date(viewedMonth.getFullYear(), viewedMonth.getMonth() + 1, 1);
+        selectedDate = '';
+        resetDetails('Selecione uma data para consultar o resumo.');
+        loadMonth();
+    });
+    document.getElementById('calendar-today').addEventListener('click', () => {
+        viewedMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        selectedDate = isoDate(today.getFullYear(), today.getMonth(), today.getDate());
+        loadMonth().then(() => renderSelectedDay(selectedDate));
+    });
+
+    loadMonth();
+})();
+</script>
+</body>
+</html>

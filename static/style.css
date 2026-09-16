@@ -529,6 +529,46 @@ tr:hover td {
     background: #fff;
 }
 
+.calendar-page {
+    max-width: 980px;
+}
+
+.calendar-page-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.calendar-page-heading .section-title,
+.calendar-page-heading .subtitulo {
+    margin-left: 0;
+    text-align: left;
+}
+
+.calendar-selection {
+    margin: 0 0 28px;
+    padding: 20px;
+    border: 1px solid #e1e1e1;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.calendar-details-button {
+    min-height: 42px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 6px;
+    background: #111;
+    color: #f4b400;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.calendar-details-button:hover {
+    background: #333;
+}
+
 .calendar-header {
     display: flex;
     align-items: center;
@@ -860,7 +900,10 @@ tr:hover td {
 }
 
 @media (max-width: 600px) {
+    .calendar-page-heading { align-items: stretch; flex-direction: column; }
+    .calendar-page-heading .btn { width: 100%; text-align: center; }
     .calendar-panel { padding: 14px 10px; }
+    .calendar-selection { padding: 14px 10px; }
     .calendar-header { align-items: flex-start; flex-direction: column; gap: 10px; }
     .calendar-controls { justify-content: space-between; width: 100%; }
     .calendar-day { min-height: 42px; }
@@ -872,5 +915,6 @@ tr:hover td {
     .calendar-students-list li { align-items: flex-start; flex-direction: column; gap: 2px; }
     .calendar-note-actions button,
     .calendar-note-form-actions button,
-    .calendar-note-new { width: 100%; }
+    .calendar-note-new,
+    .calendar-details-button { width: 100%; }
 }

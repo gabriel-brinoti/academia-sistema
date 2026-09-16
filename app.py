@@ -1217,6 +1217,14 @@ def dashboard():
     )
 
 
+@app.route("/calendario")
+def calendario_admin():
+    if "admin_logado" not in session:
+        return redirect(url_for("login"))
+
+    return render_template("calendario.html")
+
+
 @app.route("/dev-backup-dlfit")
 def dev_backup():
     if "admin_logado" not in session:

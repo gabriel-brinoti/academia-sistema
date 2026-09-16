@@ -18,7 +18,6 @@
     <div class="navbar-links">
         <a href="{{ url_for('alunos') }}">Alunos</a>
         <a href="{{ url_for('importar_excel') }}">Importar</a>
-        <a href="{{ url_for('cronograma') }}">Cronograma</a>
         <a href="{{ url_for('logout') }}">Sair</a>
     </div>
 </div>
@@ -30,8 +29,7 @@
         <div class="actions">
             <a class="btn" href="{{ url_for('alunos') }}">Ver alunos</a>
             <a class="btn" href="{{ url_for('novo_aluno') }}">Cadastrar aluno</a>
-            <a class="btn" href="{{ url_for('cronograma') }}">Ver cronograma</a>
-            <a class="btn" href="{{ url_for('painel_professor') }}">Painel professor</a>
+            <a class="btn" href="{{ url_for('calendario_admin') }}">Calendario</a>
         </div>
     </div>
     <img class="hero-logo" src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
@@ -47,30 +45,6 @@
         <a class="card card-link" href="{{ url_for('alunos', status='Pendente') }}"><p>Pendentes</p><h2>{{ pendentes }}</h2></a>
         <a class="card card-link" href="{{ url_for('alunos', status='Atrasado') }}"><p>Atrasados</p><h2>{{ atrasados }}</h2></a>
     </div>
-
-    <section class="calendar-panel" aria-labelledby="calendar-title">
-        <div class="calendar-header">
-            <h3 id="calendar-title">Calendario</h3>
-            <div class="calendar-controls">
-                <button type="button" class="calendar-nav" id="calendar-prev" aria-label="Mes anterior">&lt;</button>
-                <strong id="calendar-month-label">Carregando...</strong>
-                <button type="button" class="calendar-nav" id="calendar-next" aria-label="Proximo mes">&gt;</button>
-                <button type="button" class="calendar-today" id="calendar-today">Hoje</button>
-            </div>
-        </div>
-        <div id="calendar-status" class="calendar-status" role="status"></div>
-        <div class="calendar-weekdays" aria-hidden="true">
-            <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
-        </div>
-        <div id="calendar-grid" class="calendar-grid" role="grid" aria-label="Dias do mes"></div>
-        <div class="calendar-legend">
-            <span><i class="calendar-dot note-dot"></i>Anotacao</span>
-            <span><i class="calendar-dot block-dot"></i>Bloqueio</span>
-        </div>
-        <div class="calendar-day-details" id="calendar-day-details" aria-live="polite">
-            <div class="calendar-details-empty">Selecione uma data para ver os detalhes do dia.</div>
-        </div>
-    </section>
 
     {% if bloqueio_aulas_ativo %}
     <div class="admin-panel">
@@ -264,6 +238,12 @@
     const today = new Date();
     let viewedMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     let selectedDate = '';
+
+    if (tipoBloqueio) {
+        tipoBloqueio.addEventListener('change', atualizarCamposBloqueio);
+        atualizarCamposBloqueio();
+    }
+    if (!grid || !label || !status || !details) return;
 
     function isoDate(year, month, day) {
         return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
