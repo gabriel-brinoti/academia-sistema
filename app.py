@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, send_file, g, has_request_context
+from flask import Flask, render_template, request, redirect, url_for, session, send_file, g, has_request_context, jsonify
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -12,7 +12,7 @@ app.secret_key = "academia_secret"
 
 # Funcao extra ja pronta para venda futura.
 # Para liberar o bloqueio de aulas por fechamento especial, trocar para True.
-BLOQUEIO_AULAS_ATIVO = False
+BLOQUEIO_AULAS_ATIVO = True
 
 
 def conectar():
@@ -113,6 +113,41 @@ def texto_ordenavel(valor):
     return str(valor)
 
 
+def agora_brasil_texto():
+    return (datetime.utcnow() - timedelta(hours=3)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def data_iso_valida(valor):
+    try:
+        datetime.strptime(str(valor or ""), "%Y-%m-%d")
+        return True
+    except Exception:
+        return False
+
+
+def periodo_mes_valido(ano, mes):
+    try:
+        ano = int(ano)
+        mes = int(mes)
+    except (TypeError, ValueError):
+        return None
+
+    if ano < 2000 or ano > 2100 or mes < 1 or mes > 12:
+        return None
+
+    inicio = date(ano, mes, 1)
+    if mes == 12:
+        fim = date(ano + 1, 1, 1)
+    else:
+        fim = date(ano, mes + 1, 1)
+
+    return ano, mes, inicio.strftime("%Y-%m-%d"), fim.strftime("%Y-%m-%d")
+
+
+def erro_json(mensagem, status=400):
+    return jsonify({"ok": False, "erro": mensagem}), status
+
+
 def unir_grupo_alunos_duplicados(cursor, alunos):
     alunos_ordenados = sorted(
         alunos,
@@ -155,15 +190,31 @@ def unir_grupo_alunos_duplicados(cursor, alunos):
             UPDATE agendamentos ag
             SET aluno_id = %s
             WHERE ag.aluno_id = %s
-              AND NOT EXISTS (
+              AND (
+                  COALESCE(ag.status, 'ATIVO') <> 'ATIVO'
+                  OR NOT EXISTS (
                   SELECT 1
                   FROM agendamentos existente
                   WHERE existente.aluno_id = %s
                     AND existente.aula_id = ag.aula_id
                     AND existente.data_agendamento = ag.data_agendamento
+                    AND COALESCE(existente.status, 'ATIVO') = 'ATIVO'
+                  )
               )
         """, (principal_id, duplicado_id, principal_id))
-        cursor.execute("DELETE FROM agendamentos WHERE aluno_id = %s", (duplicado_id,))
+        cursor.execute("""
+            UPDATE agendamentos
+            SET status = 'CANCELADO',
+                cancelado_em = %s,
+                cancelado_por = 'unificacao_duplicado'
+            WHERE aluno_id = %s
+              AND COALESCE(status, 'ATIVO') = 'ATIVO'
+        """, (agora_brasil_texto(), duplicado_id))
+        cursor.execute("""
+            UPDATE agendamentos
+            SET aluno_id = %s
+            WHERE aluno_id = %s
+        """, (principal_id, duplicado_id))
         cursor.execute("DELETE FROM alunos WHERE id = %s", (duplicado_id,))
 
     cursor.execute("""
@@ -238,9 +289,12 @@ TABELAS_BACKUP = {
         "aulas_usadas_iniciais"
     ],
     "aulas": ["id", "dia_semana", "horario", "modalidade", "capacidade"],
-    "agendamentos": ["id", "aluno_id", "aula_id", "data_agendamento"],
+    "agendamentos": [
+        "id", "aluno_id", "aula_id", "data_agendamento",
+        "status", "criado_em", "cancelado_em", "cancelado_por"
+    ],
     "bloqueios_aulas": [
-        "data_bloqueio", "horario_inicio", "horario_fim", "tipo", "motivo"
+        "data_bloqueio", "horario_inicio", "horario_fim", "tipo", "modalidade", "motivo"
     ],
 }
 
@@ -371,13 +425,16 @@ def contar_aulas_usadas(cursor, aluno_id, data_inicio=None):
         cursor.execute("""
             SELECT COUNT(*) AS total
             FROM agendamentos
-            WHERE aluno_id = %s AND data_agendamento >= %s
+            WHERE aluno_id = %s
+              AND data_agendamento >= %s
+              AND COALESCE(status, 'ATIVO') = 'ATIVO'
         """, (aluno_id, data_inicio))
     else:
         cursor.execute("""
             SELECT COUNT(*) AS total
             FROM agendamentos
             WHERE aluno_id = %s
+              AND COALESCE(status, 'ATIVO') = 'ATIVO'
         """, (aluno_id,))
 
     return cursor.fetchone()["total"]
@@ -412,6 +469,7 @@ def preencher_resumo_aulas_lista(cursor, alunos):
         SELECT aluno_id, data_agendamento
         FROM agendamentos
         WHERE aluno_id = ANY(%s)
+          AND COALESCE(status, 'ATIVO') = 'ATIVO'
     """, (ids_alunos,))
     agendamentos = cursor.fetchall()
 
@@ -570,9 +628,21 @@ def aula_eh_musculacao(aula):
 
 def normalizar_tipo_bloqueio(tipo):
     tipo = str(tipo or "TODAS").upper().strip()
-    if tipo in ("AULAS", "MUSCULACAO"):
+    if tipo in ("AULAS", "MUSCULACAO", "MODALIDADE"):
         return tipo
     return "TODAS"
+
+
+def normalizar_modalidade_bloqueio(modalidade):
+    return " ".join(str(modalidade or "").upper().strip().split())
+
+
+def horario_fim_para_aula_especifica(horario_inicio):
+    try:
+        horario = datetime.strptime(str(horario_inicio), "%H:%M")
+    except ValueError:
+        return None
+    return (horario + timedelta(minutes=1)).strftime("%H:%M")
 
 
 def obter_bloqueios_aulas(cursor, data_agendamento):
@@ -580,11 +650,21 @@ def obter_bloqueios_aulas(cursor, data_agendamento):
         return []
 
     cursor.execute("""
-        SELECT data_bloqueio, horario_inicio, horario_fim, motivo, tipo
+        SELECT data_bloqueio, horario_inicio, horario_fim, motivo, tipo, modalidade
         FROM bloqueios_aulas
         WHERE data_bloqueio = %s
     """, (data_agendamento,))
     return cursor.fetchall()
+
+
+def bloqueio_aplica_no_horario_da_aula(aula, bloqueio):
+    if aula["horario"] < bloqueio["horario_inicio"]:
+        return False
+
+    if bloqueio.get("horario_fim"):
+        return aula["horario"] < bloqueio["horario_fim"]
+
+    return True
 
 
 def obter_bloqueio_para_aula(aula, bloqueios):
@@ -592,14 +672,30 @@ def obter_bloqueio_para_aula(aula, bloqueios):
         return None
 
     tipo_aula = "MUSCULACAO" if aula_eh_musculacao(aula) else "AULAS"
+    modalidade_aula = normalizar_modalidade_bloqueio(aula.get("modalidade"))
+    bloqueio_modalidade = None
+    bloqueio_tipo = None
     bloqueio_todas = None
 
     for bloqueio in bloqueios:
         tipo = normalizar_tipo_bloqueio(bloqueio.get("tipo"))
-        if tipo == tipo_aula:
-            return bloqueio
-        if tipo == "TODAS":
+        if (
+            tipo == "MODALIDADE"
+            and normalizar_modalidade_bloqueio(bloqueio.get("modalidade")) == modalidade_aula
+            and bloqueio_aplica_no_horario_da_aula(aula, bloqueio)
+        ):
+            bloqueio_modalidade = bloqueio
+            continue
+        if tipo == tipo_aula and bloqueio_aplica_no_horario_da_aula(aula, bloqueio):
+            bloqueio_tipo = bloqueio
+            continue
+        if tipo == "TODAS" and bloqueio_aplica_no_horario_da_aula(aula, bloqueio):
             bloqueio_todas = bloqueio
+
+    if bloqueio_modalidade:
+        return bloqueio_modalidade
+    if bloqueio_tipo:
+        return bloqueio_tipo
 
     return bloqueio_todas
 
@@ -608,13 +704,7 @@ def aula_bloqueada_por_horario(aula, bloqueio):
     if not bloqueio:
         return False
 
-    if aula["horario"] < bloqueio["horario_inicio"]:
-        return False
-
-    if bloqueio.get("horario_fim"):
-        return aula["horario"] < bloqueio["horario_fim"]
-
-    return True
+    return bloqueio_aplica_no_horario_da_aula(aula, bloqueio)
 
 
 def bloqueio_fecha_resto_do_dia(bloqueio):
@@ -667,8 +757,50 @@ def init_db():
             aluno_id INTEGER,
             aula_id INTEGER,
             data_agendamento TEXT,
-            UNIQUE(aluno_id, aula_id, data_agendamento)
+            status TEXT DEFAULT 'ATIVO',
+            criado_em TEXT,
+            cancelado_em TEXT,
+            cancelado_por TEXT
         )
+    """)
+
+    cursor.execute("""
+        ALTER TABLE agendamentos ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ATIVO'
+    """)
+
+    cursor.execute("""
+        ALTER TABLE agendamentos ADD COLUMN IF NOT EXISTS criado_em TEXT
+    """)
+
+    cursor.execute("""
+        ALTER TABLE agendamentos ADD COLUMN IF NOT EXISTS cancelado_em TEXT
+    """)
+
+    cursor.execute("""
+        ALTER TABLE agendamentos ADD COLUMN IF NOT EXISTS cancelado_por TEXT
+    """)
+
+    cursor.execute("""
+        UPDATE agendamentos
+        SET status = 'ATIVO'
+        WHERE status IS NULL OR status = ''
+    """)
+
+    cursor.execute("""
+        UPDATE agendamentos
+        SET criado_em = data_agendamento || ' 00:00:00'
+        WHERE criado_em IS NULL OR criado_em = ''
+    """)
+
+    cursor.execute("""
+        ALTER TABLE agendamentos
+        DROP CONSTRAINT IF EXISTS agendamentos_aluno_id_aula_id_data_agendamento_key
+    """)
+
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_agendamentos_unico_ativo
+        ON agendamentos (aluno_id, aula_id, data_agendamento)
+        WHERE COALESCE(status, 'ATIVO') = 'ATIVO'
     """)
 
     cursor.execute("""
@@ -677,6 +809,7 @@ def init_db():
             horario_inicio TEXT,
             horario_fim TEXT,
             tipo TEXT DEFAULT 'TODAS',
+            modalidade TEXT,
             motivo TEXT
         )
     """)
@@ -690,6 +823,10 @@ def init_db():
     """)
 
     cursor.execute("""
+        ALTER TABLE bloqueios_aulas ADD COLUMN IF NOT EXISTS modalidade TEXT
+    """)
+
+    cursor.execute("""
         UPDATE bloqueios_aulas SET tipo = 'TODAS' WHERE tipo IS NULL OR tipo = ''
     """)
 
@@ -698,8 +835,46 @@ def init_db():
     """)
 
     cursor.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_bloqueios_aulas_data_tipo
-        ON bloqueios_aulas (data_bloqueio, tipo)
+        DROP INDEX IF EXISTS idx_bloqueios_aulas_data_tipo
+    """)
+
+    cursor.execute("""
+        DROP INDEX IF EXISTS idx_bloqueios_aulas_data_tipo_modalidade
+    """)
+
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_bloqueios_aulas_chave
+        ON bloqueios_aulas (
+            data_bloqueio,
+            tipo,
+            COALESCE(modalidade, ''),
+            horario_inicio,
+            COALESCE(horario_fim, '')
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS calendar_notes (
+            id SERIAL PRIMARY KEY,
+            date TEXT,
+            title TEXT,
+            description TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            created_by TEXT,
+            deleted_at TEXT,
+            deleted_by TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_calendar_notes_date
+        ON calendar_notes (date)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_calendar_notes_deleted_at
+        ON calendar_notes (deleted_at)
     """)
 
     cursor.execute("""
@@ -758,6 +933,11 @@ def init_db():
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_agendamentos_aluno_data
         ON agendamentos (aluno_id, data_agendamento)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_agendamentos_status
+        ON agendamentos (status)
     """)
 
     conn.commit()
@@ -895,6 +1075,7 @@ def listar_aulas_do_dia(dia_semana=None, cursor=None):
         LEFT JOIN agendamentos ag 
             ON ag.aula_id = a.id 
             AND ag.data_agendamento = %s
+            AND COALESCE(ag.status, 'ATIVO') = 'ATIVO'
         WHERE a.dia_semana = %s
         GROUP BY a.id, a.dia_semana, a.horario, a.modalidade, a.capacidade
         ORDER BY a.horario
@@ -911,6 +1092,7 @@ def listar_aulas_do_dia(dia_semana=None, cursor=None):
         FROM agendamentos ag
         JOIN alunos al ON al.id = ag.aluno_id
         WHERE ag.data_agendamento = %s
+          AND COALESCE(ag.status, 'ATIVO') = 'ATIVO'
         ORDER BY al.nome ASC
     """, (hoje,))
     inscritos_por_aula = {}
@@ -997,15 +1179,24 @@ def dashboard():
     alunos = cursor.fetchall()
 
     bloqueios_aulas = []
+    aulas_bloqueio = []
     if BLOQUEIO_AULAS_ATIVO:
         cursor.execute("""
-            SELECT data_bloqueio, horario_inicio, horario_fim, motivo, tipo
+            SELECT data_bloqueio, horario_inicio, horario_fim, motivo, tipo, modalidade
             FROM bloqueios_aulas
             WHERE data_bloqueio >= %s
-            ORDER BY data_bloqueio ASC, horario_inicio ASC, tipo ASC
+            ORDER BY data_bloqueio ASC, horario_inicio ASC, tipo ASC, modalidade ASC
             LIMIT 10
         """, (data_hoje_brasil().strftime("%Y-%m-%d"),))
         bloqueios_aulas = cursor.fetchall()
+        cursor.execute("""
+            SELECT MIN(id) AS id, horario, modalidade
+            FROM aulas
+            WHERE modalidade <> 'MUSCULACAO'
+            GROUP BY horario, modalidade
+            ORDER BY horario ASC, modalidade ASC
+        """)
+        aulas_bloqueio = cursor.fetchall()
 
     dia_atual, aulas_hoje = listar_aulas_do_dia(cursor=cursor)
     conn.close()
@@ -1020,6 +1211,7 @@ def dashboard():
         dia_atual=dia_atual,
         aulas_hoje=aulas_hoje,
         bloqueios_aulas=bloqueios_aulas,
+        aulas_bloqueio=aulas_bloqueio,
         bloqueio_aulas_ativo=BLOQUEIO_AULAS_ATIVO,
         data_padrao_bloqueio=obter_data_base().strftime("%Y-%m-%d")
     )
@@ -1035,6 +1227,337 @@ def dev_backup():
         erro=request.args.get("erro", ""),
         sucesso=request.args.get("sucesso", "")
     )
+
+
+@app.route("/calendar_notes", methods=["GET"])
+def listar_calendar_notes():
+    if "admin_logado" not in session:
+        return erro_json("Acesso restrito ao admin.", 403)
+
+    data_nota = request.args.get("date", "").strip()
+    if data_nota and not data_iso_valida(data_nota):
+        return erro_json("Data invalida. Use o formato YYYY-MM-DD.")
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    if data_nota:
+        cursor.execute("""
+            SELECT id, date, title, description, created_at, updated_at, created_by
+            FROM calendar_notes
+            WHERE date = %s
+              AND deleted_at IS NULL
+            ORDER BY created_at ASC, id ASC
+        """, (data_nota,))
+    else:
+        cursor.execute("""
+            SELECT id, date, title, description, created_at, updated_at, created_by
+            FROM calendar_notes
+            WHERE deleted_at IS NULL
+            ORDER BY date ASC, created_at ASC, id ASC
+        """)
+
+    notas = cursor.fetchall()
+    conn.close()
+    return jsonify({"ok": True, "notes": notas})
+
+
+@app.route("/calendar_notes", methods=["POST"])
+def criar_calendar_note():
+    if "admin_logado" not in session:
+        return erro_json("Acesso restrito ao admin.", 403)
+
+    dados = request.get_json(silent=True) or request.form
+    data_nota = str(dados.get("date", "")).strip()
+    titulo = str(dados.get("title", "")).strip()
+    descricao = str(dados.get("description", "")).strip()
+
+    if not data_iso_valida(data_nota):
+        return erro_json("Data invalida. Use o formato YYYY-MM-DD.")
+    if not titulo:
+        return erro_json("Titulo obrigatorio.")
+
+    agora = agora_brasil_texto()
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO calendar_notes (
+            date, title, description, created_at, updated_at, created_by
+        )
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING id, date, title, description, created_at, updated_at, created_by
+    """, (data_nota, titulo, descricao, agora, agora, "admin"))
+    nota = cursor.fetchone()
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "note": nota}), 201
+
+
+@app.route("/calendar_notes/<int:note_id>", methods=["POST", "PUT"])
+def editar_calendar_note(note_id):
+    if "admin_logado" not in session:
+        return erro_json("Acesso restrito ao admin.", 403)
+
+    dados = request.get_json(silent=True) or request.form
+    titulo = str(dados.get("title", "")).strip()
+    descricao = str(dados.get("description", "")).strip()
+
+    if not titulo:
+        return erro_json("Titulo obrigatorio.")
+
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE calendar_notes
+        SET title = %s,
+            description = %s,
+            updated_at = %s
+        WHERE id = %s
+          AND deleted_at IS NULL
+        RETURNING id, date, title, description, created_at, updated_at, created_by
+    """, (titulo, descricao, agora_brasil_texto(), note_id))
+    nota = cursor.fetchone()
+    conn.commit()
+    conn.close()
+
+    if not nota:
+        return erro_json("Anotacao nao encontrada.", 404)
+    return jsonify({"ok": True, "note": nota})
+
+
+@app.route("/calendar_notes/<int:note_id>/delete", methods=["POST", "DELETE"])
+def excluir_calendar_note(note_id):
+    if "admin_logado" not in session:
+        return erro_json("Acesso restrito ao admin.", 403)
+
+    agora = agora_brasil_texto()
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE calendar_notes
+        SET deleted_at = %s,
+            deleted_by = %s,
+            updated_at = %s
+        WHERE id = %s
+          AND deleted_at IS NULL
+        RETURNING id
+    """, (agora, "admin", agora, note_id))
+    nota = cursor.fetchone()
+    conn.commit()
+    conn.close()
+
+    if not nota:
+        return erro_json("Anotacao nao encontrada.", 404)
+    return jsonify({"ok": True})
+
+
+@app.route("/calendar_history", methods=["GET"])
+def calendar_history():
+    if "admin_logado" not in session:
+        return erro_json("Acesso restrito ao admin.", 403)
+
+    data_historico = request.args.get("date", "").strip()
+    if not data_iso_valida(data_historico):
+        return erro_json("Data invalida. Use o formato YYYY-MM-DD.")
+
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+            ag.id AS agendamento_id,
+            ag.aluno_id,
+            ag.aula_id,
+            ag.data_agendamento,
+            COALESCE(ag.status, 'ATIVO') AS status,
+            ag.criado_em,
+            ag.cancelado_em,
+            ag.cancelado_por,
+            al.nome,
+            al.data_nascimento,
+            a.horario,
+            a.modalidade,
+            a.capacidade
+        FROM agendamentos ag
+        JOIN alunos al ON al.id = ag.aluno_id
+        JOIN aulas a ON a.id = ag.aula_id
+        WHERE ag.data_agendamento = %s
+        ORDER BY a.horario ASC, a.modalidade ASC, al.nome ASC, ag.id ASC
+    """, (data_historico,))
+    registros = cursor.fetchall()
+    conn.close()
+
+    alunos_unicos_ativos = set()
+    active_bookings = 0
+    cancelled_bookings = 0
+    aulas_por_id = {}
+
+    for registro in registros:
+        status = registro["status"] or "ATIVO"
+        if status == "ATIVO":
+            active_bookings += 1
+            alunos_unicos_ativos.add(registro["aluno_id"])
+        elif status == "CANCELADO":
+            cancelled_bookings += 1
+
+        aula_id = registro["aula_id"]
+        if aula_id not in aulas_por_id:
+            aulas_por_id[aula_id] = {
+                "aula_id": aula_id,
+                "modalidade": registro["modalidade"],
+                "horario": registro["horario"],
+                "capacidade": registro["capacidade"],
+                "active_count": 0,
+                "cancelled_count": 0,
+                "students": []
+            }
+
+        aula = aulas_por_id[aula_id]
+        if status == "ATIVO":
+            aula["active_count"] += 1
+        elif status == "CANCELADO":
+            aula["cancelled_count"] += 1
+
+        aula["students"].append({
+            "agendamento_id": registro["agendamento_id"],
+            "aluno_id": registro["aluno_id"],
+            "nome": registro["nome"],
+            "idade": calcular_idade(registro["data_nascimento"]),
+            "status": status,
+            "criado_em": registro["criado_em"],
+            "cancelado_em": registro["cancelado_em"],
+            "cancelado_por": registro["cancelado_por"]
+        })
+
+    return jsonify({
+        "ok": True,
+        "date": data_historico,
+        "summary": {
+            "unique_students": len(alunos_unicos_ativos),
+            "active_bookings": active_bookings,
+            "cancelled_bookings": cancelled_bookings
+        },
+        "classes": list(aulas_por_id.values())
+    })
+
+
+@app.route("/calendar_summary", methods=["GET"])
+def calendar_summary():
+    if "admin_logado" not in session:
+        return erro_json("Acesso restrito ao admin.", 403)
+
+    periodo = periodo_mes_valido(request.args.get("year"), request.args.get("month"))
+    if not periodo:
+        return erro_json("Ano ou mes invalido.")
+
+    ano, mes, inicio_mes, inicio_proximo_mes = periodo
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("""
+        WITH daily_bookings AS (
+            SELECT
+                ag.data_agendamento AS date,
+                COUNT(*) FILTER (
+                    WHERE COALESCE(ag.status, 'ATIVO') = 'ATIVO'
+                ) AS active_bookings,
+                COUNT(*) FILTER (
+                    WHERE COALESCE(ag.status, 'ATIVO') = 'CANCELADO'
+                ) AS cancelled_bookings,
+                COUNT(DISTINCT ag.aluno_id) FILTER (
+                    WHERE COALESCE(ag.status, 'ATIVO') = 'ATIVO'
+                ) AS unique_students
+            FROM agendamentos ag
+            WHERE ag.data_agendamento >= %s
+              AND ag.data_agendamento < %s
+            GROUP BY ag.data_agendamento
+        ),
+        daily_notes AS (
+            SELECT date, COUNT(*) AS notes_count
+            FROM calendar_notes
+            WHERE date >= %s
+              AND date < %s
+              AND deleted_at IS NULL
+            GROUP BY date
+        )
+        SELECT
+            COALESCE(db.date, dn.date) AS date,
+            COALESCE(db.unique_students, 0) AS unique_students,
+            COALESCE(db.active_bookings, 0) AS active_bookings,
+            COALESCE(db.cancelled_bookings, 0) AS cancelled_bookings,
+            (COALESCE(dn.notes_count, 0) > 0) AS has_notes
+        FROM daily_bookings db
+        FULL OUTER JOIN daily_notes dn ON dn.date = db.date
+        ORDER BY date ASC
+    """, (inicio_mes, inicio_proximo_mes, inicio_mes, inicio_proximo_mes))
+
+    dias = {}
+    for registro in cursor.fetchall():
+        data_resumo = registro["date"]
+        dias[data_resumo] = {
+            "date": data_resumo,
+            "unique_students": int(registro["unique_students"] or 0),
+            "active_bookings": int(registro["active_bookings"] or 0),
+            "cancelled_bookings": int(registro["cancelled_bookings"] or 0),
+            "has_notes": bool(registro["has_notes"]),
+            "is_blocked": False
+        }
+
+    if BLOQUEIO_AULAS_ATIVO:
+        cursor.execute("""
+            SELECT data_bloqueio, COUNT(*) AS total_bloqueios
+            FROM bloqueios_aulas
+            WHERE data_bloqueio >= %s
+              AND data_bloqueio < %s
+            GROUP BY data_bloqueio
+        """, (inicio_mes, inicio_proximo_mes))
+        for registro in cursor.fetchall():
+            data_bloqueada = registro["data_bloqueio"]
+            dia = dias.setdefault(data_bloqueada, {
+                "date": data_bloqueada,
+                "unique_students": 0,
+                "active_bookings": 0,
+                "cancelled_bookings": 0,
+                "has_notes": False,
+                "is_blocked": False
+            })
+            dia["is_blocked"] = True
+
+    conn.close()
+    return jsonify({
+        "ok": True,
+        "year": ano,
+        "month": mes,
+        "days": [dias[data] for data in sorted(dias)]
+    })
+
+
+@app.route("/calendar_blocks", methods=["GET"])
+def calendar_blocks():
+    if "admin_logado" not in session:
+        return erro_json("Acesso restrito ao admin.", 403)
+
+    data_bloqueio = request.args.get("date", "").strip()
+    if not data_iso_valida(data_bloqueio):
+        return erro_json("Data invalida. Use o formato YYYY-MM-DD.")
+
+    if not BLOQUEIO_AULAS_ATIVO:
+        return jsonify({"ok": True, "date": data_bloqueio, "blocks": []})
+
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT data_bloqueio, horario_inicio, horario_fim, tipo, modalidade, motivo
+        FROM bloqueios_aulas
+        WHERE data_bloqueio = %s
+        ORDER BY horario_inicio ASC, tipo ASC, modalidade ASC
+    """, (data_bloqueio,))
+    bloqueios = cursor.fetchall()
+    conn.close()
+
+    return jsonify({
+        "ok": True,
+        "date": data_bloqueio,
+        "blocks": bloqueios
+    })
 
 
 @app.route("/baixar_backup")
@@ -1133,8 +1656,33 @@ def bloqueio_aulas():
     data_bloqueio = request.form.get("data_bloqueio", "")
     horario_inicio = request.form.get("horario_inicio", "")
     horario_fim = request.form.get("horario_fim", "")
-    tipo = normalizar_tipo_bloqueio(request.form.get("tipo_bloqueio", "TODAS"))
+    tipo = normalizar_tipo_bloqueio(request.form.get("tipo_bloqueio", "AULAS"))
+    aula_bloqueio_id = request.form.get("aula_bloqueio", "")
+    modalidade = None
     motivo = request.form.get("motivo", "")
+
+    conn = None
+    cursor = None
+
+    if tipo == "AULAS":
+        if not aula_bloqueio_id:
+            return redirect(url_for("dashboard"))
+        conn = conectar()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT horario, modalidade
+            FROM aulas
+            WHERE id = %s
+              AND modalidade <> 'MUSCULACAO'
+        """, (aula_bloqueio_id,))
+        aula_bloqueio = cursor.fetchone()
+        if not aula_bloqueio:
+            conn.close()
+            return redirect(url_for("dashboard"))
+        tipo = "MODALIDADE"
+        modalidade = normalizar_modalidade_bloqueio(aula_bloqueio["modalidade"])
+        horario_inicio = aula_bloqueio["horario"]
+        horario_fim = horario_fim_para_aula_especifica(horario_inicio)
 
     if horario_fim and horario_fim <= horario_inicio:
         horario_fim = ""
@@ -1143,25 +1691,32 @@ def bloqueio_aulas():
         return redirect(url_for("dashboard"))
 
     if data_bloqueio and horario_inicio:
-        conn = conectar()
-        cursor = conn.cursor()
+        if not conn:
+            conn = conectar()
+            cursor = conn.cursor()
         limpar_bloqueios_antigos(cursor)
         cursor.execute("""
-            INSERT INTO bloqueios_aulas (data_bloqueio, horario_inicio, horario_fim, tipo, motivo)
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (data_bloqueio, tipo)
-            DO UPDATE SET horario_inicio = EXCLUDED.horario_inicio,
-                          horario_fim = EXCLUDED.horario_fim,
-                          motivo = EXCLUDED.motivo
-        """, (data_bloqueio, horario_inicio, horario_fim or None, tipo, motivo))
+            DELETE FROM bloqueios_aulas
+            WHERE data_bloqueio = %s
+              AND tipo = %s
+              AND COALESCE(modalidade, '') = COALESCE(%s, '')
+              AND horario_inicio = %s
+              AND COALESCE(horario_fim, '') = COALESCE(%s, '')
+        """, (data_bloqueio, tipo, modalidade, horario_inicio, horario_fim or ""))
+        cursor.execute("""
+            INSERT INTO bloqueios_aulas (data_bloqueio, horario_inicio, horario_fim, tipo, modalidade, motivo)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (data_bloqueio, horario_inicio, horario_fim or None, tipo, modalidade, motivo))
         conn.commit()
+        conn.close()
+    elif conn:
         conn.close()
 
     return redirect(url_for("dashboard"))
 
 
-@app.route("/remover_bloqueio_aulas/<data_bloqueio>/<tipo>", methods=["POST"])
-def remover_bloqueio_aulas(data_bloqueio, tipo):
+@app.route("/remover_bloqueio_aulas_item", methods=["POST"])
+def remover_bloqueio_aulas_item():
     if "admin_logado" not in session:
         return redirect(url_for("login"))
 
@@ -1171,8 +1726,54 @@ def remover_bloqueio_aulas(data_bloqueio, tipo):
     conn = conectar()
     cursor = conn.cursor()
     cursor.execute(
-        "DELETE FROM bloqueios_aulas WHERE data_bloqueio = %s AND tipo = %s",
-        (data_bloqueio, normalizar_tipo_bloqueio(tipo))
+        """
+        DELETE FROM bloqueios_aulas
+        WHERE data_bloqueio = %s
+          AND tipo = %s
+          AND COALESCE(modalidade, '') = COALESCE(%s, '')
+          AND horario_inicio = %s
+          AND COALESCE(horario_fim, '') = COALESCE(%s, '')
+        """,
+        (
+            request.form.get("data_bloqueio", ""),
+            normalizar_tipo_bloqueio(request.form.get("tipo", "TODAS")),
+            normalizar_modalidade_bloqueio(request.form.get("modalidade", "")),
+            request.form.get("horario_inicio", ""),
+            request.form.get("horario_fim", "")
+        )
+    )
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/remover_bloqueio_aulas/<data_bloqueio>/<tipo>", methods=["POST"])
+@app.route("/remover_bloqueio_aulas/<data_bloqueio>/<tipo>/<path:modalidade>", methods=["POST"])
+def remover_bloqueio_aulas(data_bloqueio, tipo, modalidade=""):
+    if "admin_logado" not in session:
+        return redirect(url_for("login"))
+
+    if not BLOQUEIO_AULAS_ATIVO:
+        return redirect(url_for("dashboard"))
+
+    if modalidade == "-":
+        modalidade = ""
+
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        DELETE FROM bloqueios_aulas
+        WHERE data_bloqueio = %s
+          AND tipo = %s
+          AND COALESCE(modalidade, '') = COALESCE(%s, '')
+        """,
+        (
+            data_bloqueio,
+            normalizar_tipo_bloqueio(tipo),
+            normalizar_modalidade_bloqueio(modalidade)
+        )
     )
     conn.commit()
     conn.close()
@@ -1374,7 +1975,14 @@ def excluir_aluno(id):
 
     conn = conectar()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM agendamentos WHERE aluno_id = %s", (id,))
+    cursor.execute("""
+        UPDATE agendamentos
+        SET status = 'CANCELADO',
+            cancelado_em = %s,
+            cancelado_por = 'exclusao_aluno'
+        WHERE aluno_id = %s
+          AND COALESCE(status, 'ATIVO') = 'ATIVO'
+    """, (agora_brasil_texto(), id))
     cursor.execute("DELETE FROM alunos WHERE id = %s", (id,))
     conn.commit()
     conn.close()
@@ -1594,7 +2202,9 @@ def agendar_aula(aula_id):
     cursor.execute("""
         SELECT COUNT(*) AS total
         FROM agendamentos
-        WHERE aula_id = %s AND data_agendamento = %s
+        WHERE aula_id = %s
+          AND data_agendamento = %s
+          AND COALESCE(status, 'ATIVO') = 'ATIVO'
     """, (aula_id, data_agendamento))
     ocupadas = cursor.fetchone()["total"]
 
@@ -1623,7 +2233,10 @@ def agendar_aula(aula_id):
     cursor.execute("""
         SELECT 1
         FROM agendamentos
-        WHERE aluno_id = %s AND aula_id = %s AND data_agendamento = %s
+        WHERE aluno_id = %s
+          AND aula_id = %s
+          AND data_agendamento = %s
+          AND COALESCE(status, 'ATIVO') = 'ATIVO'
     """, (aluno_id, aula_id, data_agendamento))
 
     if cursor.fetchone():
@@ -1640,9 +2253,10 @@ def agendar_aula(aula_id):
 
     # salvar
     cursor.execute("""
-        INSERT INTO agendamentos (aluno_id, aula_id, data_agendamento)
-        VALUES (%s, %s, %s)
-    """, (aluno_id, aula_id, data_agendamento))
+        INSERT INTO agendamentos (aluno_id, aula_id, data_agendamento, status, criado_em)
+        VALUES (%s, %s, %s, 'ATIVO', %s)
+        ON CONFLICT DO NOTHING
+    """, (aluno_id, aula_id, data_agendamento, agora_brasil_texto()))
 
     conn.commit()
     aulas_usadas_sistema = aulas_usadas_sistema + 1
@@ -1752,10 +2366,10 @@ def aceitar_contrato():
         )
 
     cursor.execute("""
-        INSERT INTO agendamentos (aluno_id, aula_id, data_agendamento)
-        VALUES (%s, %s, %s)
+        INSERT INTO agendamentos (aluno_id, aula_id, data_agendamento, status, criado_em)
+        VALUES (%s, %s, %s, 'ATIVO', %s)
         ON CONFLICT DO NOTHING
-    """, (aluno_id, aula_id, data_agendamento))
+    """, (aluno_id, aula_id, data_agendamento, agora_brasil_texto()))
 
     conn.commit()
 
@@ -1793,7 +2407,15 @@ def remover_agendamento(agendamento_id):
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM agendamentos WHERE id = %s", (agendamento_id,))
+    cancelado_por = "admin" if "admin_logado" in session else "professor"
+    cursor.execute("""
+        UPDATE agendamentos
+        SET status = 'CANCELADO',
+            cancelado_em = %s,
+            cancelado_por = %s
+        WHERE id = %s
+          AND COALESCE(status, 'ATIVO') = 'ATIVO'
+    """, (agora_brasil_texto(), cancelado_por, agendamento_id))
 
     conn.commit()
     conn.close()

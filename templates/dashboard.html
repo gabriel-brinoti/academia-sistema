@@ -48,17 +48,50 @@
         <a class="card card-link" href="{{ url_for('alunos', status='Atrasado') }}"><p>Atrasados</p><h2>{{ atrasados }}</h2></a>
     </div>
 
+    <section class="calendar-panel" aria-labelledby="calendar-title">
+        <div class="calendar-header">
+            <h3 id="calendar-title">Calendario</h3>
+            <div class="calendar-controls">
+                <button type="button" class="calendar-nav" id="calendar-prev" aria-label="Mes anterior">&lt;</button>
+                <strong id="calendar-month-label">Carregando...</strong>
+                <button type="button" class="calendar-nav" id="calendar-next" aria-label="Proximo mes">&gt;</button>
+                <button type="button" class="calendar-today" id="calendar-today">Hoje</button>
+            </div>
+        </div>
+        <div id="calendar-status" class="calendar-status" role="status"></div>
+        <div class="calendar-weekdays" aria-hidden="true">
+            <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
+        </div>
+        <div id="calendar-grid" class="calendar-grid" role="grid" aria-label="Dias do mes"></div>
+        <div class="calendar-legend">
+            <span><i class="calendar-dot note-dot"></i>Anotacao</span>
+            <span><i class="calendar-dot block-dot"></i>Bloqueio</span>
+        </div>
+        <div class="calendar-day-details" id="calendar-day-details" aria-live="polite">
+            <div class="calendar-details-empty">Selecione uma data para ver os detalhes do dia.</div>
+        </div>
+    </section>
+
     {% if bloqueio_aulas_ativo %}
     <div class="admin-panel">
         <h3>Bloquear aulas por fechamento especial</h3>
-        <p class="subtitulo">Use "Bloquear ate" apenas quando o fechamento tiver hora para terminar. Se deixar vazio, bloqueia ate o fim do dia.</p>
+        <p class="subtitulo">Para aulas, escolha a aula especifica. Para musculacao, informe o horario inicial e, se quiser, o horario final.</p>
         <form method="POST" action="{{ url_for('bloqueio_aulas') }}" class="inline-form">
             <div class="form-field">
                 <label>Bloquear</label>
-                <select name="tipo_bloqueio">
-                    <option value="TODAS">Todas</option>
+                <select name="tipo_bloqueio" id="tipo_bloqueio">
                     <option value="AULAS">Aulas</option>
                     <option value="MUSCULACAO">Musculacao</option>
+                </select>
+            </div>
+
+            <div class="form-field" id="campo_aula_bloqueio">
+                <label>Aula</label>
+                <select name="aula_bloqueio" id="aula_bloqueio">
+                    <option value="">Escolha a aula</option>
+                    {% for aula in aulas_bloqueio %}
+                        <option value="{{ aula.id }}">{{ aula.horario }} - {{ aula.modalidade }}</option>
+                    {% endfor %}
                 </select>
             </div>
 
@@ -67,12 +100,12 @@
                 <input type="date" name="data_bloqueio" value="{{ data_padrao_bloqueio }}" required>
             </div>
 
-            <div class="form-field">
+            <div class="form-field campo-horario-bloqueio">
                 <label>Bloquear de</label>
-                <input type="time" name="horario_inicio" required>
+                <input type="time" name="horario_inicio" id="horario_inicio_bloqueio">
             </div>
 
-            <div class="form-field">
+            <div class="form-field campo-horario-bloqueio">
                 <label>Bloquear ate</label>
                 <input type="time" name="horario_fim">
             </div>
@@ -94,21 +127,32 @@
                         Aulas -
                     {% elif bloqueio.tipo == 'MUSCULACAO' %}
                         Musculacao -
+                    {% elif bloqueio.tipo == 'MODALIDADE' %}
+                        {{ bloqueio.modalidade }} -
                     {% else %}
                         Todas -
                     {% endif %}
                     {{ bloqueio.data_bloqueio[8:10] }}/{{ bloqueio.data_bloqueio[5:7] }}/{{ bloqueio.data_bloqueio[0:4] }}
-                    de {{ bloqueio.horario_inicio }}
-                    {% if bloqueio.horario_fim %}
-                        ate {{ bloqueio.horario_fim }}
+                    {% if bloqueio.tipo == 'MODALIDADE' %}
+                        as {{ bloqueio.horario_inicio }}
                     {% else %}
-                        ate o fim do dia
+                        de {{ bloqueio.horario_inicio }}
+                        {% if bloqueio.horario_fim %}
+                            ate {{ bloqueio.horario_fim }}
+                        {% else %}
+                            ate o fim do dia
+                        {% endif %}
                     {% endif %}
                 </span>
                 {% if bloqueio.motivo %}
                     <span>{{ bloqueio.motivo }}</span>
                 {% endif %}
-                <form method="POST" action="{{ url_for('remover_bloqueio_aulas', data_bloqueio=bloqueio.data_bloqueio, tipo=bloqueio.tipo or 'TODAS') }}">
+                <form method="POST" action="{{ url_for('remover_bloqueio_aulas_item') }}">
+                    <input type="hidden" name="data_bloqueio" value="{{ bloqueio.data_bloqueio }}">
+                    <input type="hidden" name="tipo" value="{{ bloqueio.tipo or 'TODAS' }}">
+                    <input type="hidden" name="modalidade" value="{{ bloqueio.modalidade or '' }}">
+                    <input type="hidden" name="horario_inicio" value="{{ bloqueio.horario_inicio }}">
+                    <input type="hidden" name="horario_fim" value="{{ bloqueio.horario_fim or '' }}">
                     <button type="submit" class="btn-danger">Remover</button>
                 </form>
             </div>
@@ -202,5 +246,384 @@
         </div>
     {% endif %}
 </div>
+<script>
+(() => {
+    const grid = document.getElementById('calendar-grid');
+    const label = document.getElementById('calendar-month-label');
+    const status = document.getElementById('calendar-status');
+    const details = document.getElementById('calendar-day-details');
+    const tipoBloqueio = document.getElementById('tipo_bloqueio');
+    const campoAulaBloqueio = document.getElementById('campo_aula_bloqueio');
+    const aulaBloqueio = document.getElementById('aula_bloqueio');
+    const camposHorarioBloqueio = document.querySelectorAll('.campo-horario-bloqueio');
+    const horarioInicioBloqueio = document.getElementById('horario_inicio_bloqueio');
+    const monthNames = [
+        'Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    const today = new Date();
+    let viewedMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    let selectedDate = '';
+
+    function isoDate(year, month, day) {
+        return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+
+    function formatDate(date) {
+        const [year, month, day] = date.split('-');
+        return `${day}/${month}/${year}`;
+    }
+
+    function makeElement(tag, className, text) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        if (text !== undefined && text !== null) element.textContent = text;
+        return element;
+    }
+
+    function atualizarCamposBloqueio() {
+        if (!tipoBloqueio) return;
+        const bloqueiaMusculacao = tipoBloqueio.value === 'MUSCULACAO';
+        if (campoAulaBloqueio) campoAulaBloqueio.style.display = bloqueiaMusculacao ? 'none' : '';
+        camposHorarioBloqueio.forEach((campo) => {
+            campo.style.display = bloqueiaMusculacao ? '' : 'none';
+        });
+        if (aulaBloqueio) aulaBloqueio.required = !bloqueiaMusculacao;
+        if (horarioInicioBloqueio) horarioInicioBloqueio.required = bloqueiaMusculacao;
+    }
+
+    function formatDateTime(value) {
+        if (!value) return '';
+        const parts = String(value).split(' ');
+        if (parts.length < 2) return String(value);
+        const [datePart, timePart] = parts;
+        return `${formatDate(datePart)} as ${timePart.slice(0, 5)}`;
+    }
+
+    function resetDayDetails(text) {
+        details.innerHTML = '';
+        details.appendChild(makeElement('div', 'calendar-details-empty', text));
+    }
+
+    function renderNoteForm(date, note) {
+        const form = makeElement('form', 'calendar-note-form');
+        form.dataset.noteId = note ? note.id : '';
+
+        const title = makeElement('input', '');
+        title.type = 'text';
+        title.name = 'title';
+        title.placeholder = 'Titulo da anotacao';
+        title.value = note ? note.title : '';
+        title.required = true;
+
+        const description = makeElement('textarea', '');
+        description.name = 'description';
+        description.placeholder = 'Escreva a anotacao do dia';
+        description.rows = 4;
+        description.value = note ? (note.description || '') : '';
+
+        const actions = makeElement('div', 'calendar-note-form-actions');
+        const save = makeElement('button', '', note ? 'Salvar' : 'Criar anotacao');
+        save.type = 'submit';
+        actions.appendChild(save);
+
+        if (note) {
+            const cancel = makeElement('button', 'calendar-note-cancel', 'Cancelar');
+            cancel.type = 'button';
+            cancel.addEventListener('click', () => loadDayDetails(date));
+            actions.appendChild(cancel);
+        }
+
+        form.appendChild(title);
+        form.appendChild(description);
+        form.appendChild(actions);
+        form.addEventListener('submit', (event) => saveNote(event, date));
+        return form;
+    }
+
+    function renderNotes(date, notes) {
+        const section = makeElement('section', 'calendar-notes-section');
+        section.appendChild(makeElement('h4', '', 'Anotacoes'));
+
+        const list = makeElement('div', 'calendar-notes-list');
+        if (!notes.length) {
+            list.appendChild(makeElement('div', 'calendar-details-empty', 'Nenhuma anotacao para esta data.'));
+        } else {
+            notes.forEach((note) => {
+                const item = makeElement('article', 'calendar-note-item');
+                item.dataset.noteId = note.id;
+                item.appendChild(makeElement('strong', '', note.title));
+
+                const description = makeElement('p', 'calendar-note-description', note.description || '');
+                item.appendChild(description);
+                if ((note.description || '').length > 260) {
+                    description.classList.add('calendar-note-collapsed');
+                    const toggle = makeElement('button', 'calendar-note-toggle', 'Ver mais');
+                    toggle.type = 'button';
+                    toggle.addEventListener('click', () => {
+                        const collapsed = description.classList.toggle('calendar-note-collapsed');
+                        toggle.textContent = collapsed ? 'Ver mais' : 'Ver menos';
+                    });
+                    item.appendChild(toggle);
+                }
+
+                const meta = makeElement('small', '', note.updated_at ? `Atualizada ${formatDateTime(note.updated_at)}` : '');
+                item.appendChild(meta);
+
+                const actions = makeElement('div', 'calendar-note-actions');
+                const edit = makeElement('button', '', 'Editar');
+                edit.type = 'button';
+                edit.addEventListener('click', () => {
+                    item.replaceChildren(renderNoteForm(date, note));
+                });
+
+                const remove = makeElement('button', 'calendar-note-delete', 'Excluir');
+                remove.type = 'button';
+                remove.addEventListener('click', () => deleteNote(note.id, date));
+                actions.appendChild(edit);
+                actions.appendChild(remove);
+                item.appendChild(actions);
+                list.appendChild(item);
+            });
+        }
+        section.appendChild(list);
+
+        const createToggle = makeElement('button', 'calendar-note-new', '+ Nova anotacao');
+        createToggle.type = 'button';
+        createToggle.addEventListener('click', () => {
+            createToggle.replaceWith(renderNoteForm(date));
+        });
+        section.appendChild(createToggle);
+        return section;
+    }
+
+    function blockTypeLabel(block) {
+        if (block.tipo === 'MUSCULACAO') return 'Musculacao';
+        if (block.tipo === 'MODALIDADE') return block.modalidade || 'Aula especifica';
+        if (block.tipo === 'AULAS') return 'Aulas';
+        return 'Todas';
+    }
+
+    function blockPeriodText(block) {
+        if (block.tipo === 'MODALIDADE') return `as ${block.horario_inicio}`;
+        if (block.horario_fim) return `de ${block.horario_inicio} ate ${block.horario_fim}`;
+        return `de ${block.horario_inicio} ate o fim do dia`;
+    }
+
+    function renderBlocks(blocks) {
+        if (!blocks.length) return null;
+
+        const section = makeElement('section', 'calendar-blocks-section');
+        section.appendChild(makeElement('h4', '', 'Bloqueio ativo'));
+        blocks.forEach((block) => {
+            const item = makeElement('div', 'calendar-block-item');
+            item.appendChild(makeElement('strong', '', `${blockTypeLabel(block)} - ${blockPeriodText(block)}`));
+            if (block.motivo) item.appendChild(makeElement('p', '', `Motivo: ${block.motivo}`));
+            section.appendChild(item);
+        });
+        return section;
+    }
+
+    function renderDayDetails(history, notes, blocks) {
+        const summary = history.summary || {};
+        const classes = history.classes || [];
+        details.innerHTML = '';
+
+        const header = makeElement('div', 'calendar-details-header');
+        header.appendChild(makeElement('h4', '', formatDate(history.date)));
+
+        const totals = makeElement('div', 'calendar-details-totals');
+        totals.appendChild(makeElement('div', 'calendar-total-box', `${summary.unique_students || 0}\nAlunos unicos`));
+        totals.appendChild(makeElement('div', 'calendar-total-box', `${summary.active_bookings || 0}\nInscricoes ativas`));
+        totals.appendChild(makeElement('div', 'calendar-total-box', `${summary.cancelled_bookings || 0}\nCancelamentos`));
+        header.appendChild(totals);
+        details.appendChild(header);
+
+        const blockSection = renderBlocks(blocks || []);
+        if (blockSection) details.appendChild(blockSection);
+
+        if (!classes.length) {
+            details.appendChild(makeElement('div', 'calendar-details-empty', 'Nenhum agendamento encontrado para esta data.'));
+        } else {
+            const list = makeElement('div', 'calendar-classes-list');
+            classes.forEach((aula) => {
+                const item = makeElement('article', 'calendar-class-item');
+                const title = makeElement('div', 'calendar-class-title');
+                title.appendChild(makeElement('strong', '', `${aula.modalidade} - ${aula.horario}`));
+                title.appendChild(makeElement('span', '', `${aula.active_count || 0} ativos - ${aula.cancelled_count || 0} cancelados`));
+                item.appendChild(title);
+
+                const students = aula.students || [];
+                if (!students.length) {
+                    item.appendChild(makeElement('p', 'calendar-details-empty', 'Nenhum aluno registrado nesta aula.'));
+                } else {
+                    const studentList = makeElement('ul', 'calendar-students-list');
+                    students.forEach((student) => {
+                        const row = makeElement('li', student.status === 'CANCELADO' ? 'student-cancelled' : '');
+                        const idade = student.idade === null || student.idade === undefined ? 'idade nao informada' : `${student.idade} anos`;
+                        row.appendChild(makeElement('span', '', `${student.nome} - ${idade}`));
+                        row.appendChild(makeElement('em', '', student.status === 'CANCELADO' ? 'Cancelado' : 'Ativo'));
+                        studentList.appendChild(row);
+                    });
+                    item.appendChild(studentList);
+                }
+                list.appendChild(item);
+            });
+            details.appendChild(list);
+        }
+        details.appendChild(renderNotes(history.date, notes));
+    }
+
+    async function loadDayDetails(date) {
+        resetDayDetails('Carregando detalhes do dia...');
+        try {
+            const [historyResponse, notesResponse, blocksResponse] = await Promise.all([
+                fetch(`/calendar_history?date=${date}`, { credentials: 'same-origin' }),
+                fetch(`/calendar_notes?date=${date}`, { credentials: 'same-origin' }),
+                fetch(`/calendar_blocks?date=${date}`, { credentials: 'same-origin' })
+            ]);
+            const history = await historyResponse.json();
+            const notes = await notesResponse.json();
+            const blocks = await blocksResponse.json();
+            if (!historyResponse.ok || !history.ok) throw new Error(history.erro || 'Nao foi possivel carregar os detalhes do dia.');
+            if (!notesResponse.ok || !notes.ok) throw new Error(notes.erro || 'Nao foi possivel carregar as anotacoes.');
+            if (!blocksResponse.ok || !blocks.ok) throw new Error(blocks.erro || 'Nao foi possivel carregar os bloqueios.');
+            renderDayDetails(history, notes.notes || [], blocks.blocks || []);
+        } catch (error) {
+            resetDayDetails(error.message);
+        }
+    }
+
+    async function saveNote(event, date) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const noteId = form.dataset.noteId;
+        const submit = form.querySelector('button[type="submit"]');
+        submit.disabled = true;
+        submit.textContent = 'Salvando...';
+        const payload = {
+            date,
+            title: form.elements.title.value,
+            description: form.elements.description.value
+        };
+        try {
+            const response = await fetch(noteId ? `/calendar_notes/${noteId}` : '/calendar_notes', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) throw new Error(data.erro || 'Nao foi possivel salvar a anotacao.');
+            await loadMonth();
+        } catch (error) {
+            alert(error.message);
+            submit.disabled = false;
+            submit.textContent = noteId ? 'Salvar' : 'Criar anotacao';
+        }
+    }
+
+    async function deleteNote(noteId, date) {
+        if (!confirm('Excluir esta anotacao?')) return;
+        try {
+            const response = await fetch(`/calendar_notes/${noteId}/delete`, {
+                method: 'POST',
+                credentials: 'same-origin'
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) throw new Error(data.erro || 'Nao foi possivel excluir a anotacao.');
+            await loadMonth();
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    function renderCalendar(days) {
+        const metrics = new Map(days.map(day => [day.date, day]));
+        const year = viewedMonth.getFullYear();
+        const month = viewedMonth.getMonth();
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        const todayKey = isoDate(today.getFullYear(), today.getMonth(), today.getDate());
+
+        label.textContent = `${monthNames[month]} ${year}`;
+        grid.innerHTML = '';
+        for (let index = 0; index < firstDay; index += 1) {
+            const empty = document.createElement('span');
+            empty.className = 'calendar-day calendar-day-empty';
+            empty.setAttribute('aria-hidden', 'true');
+            grid.appendChild(empty);
+        }
+        for (let day = 1; day <= lastDay; day += 1) {
+            const date = isoDate(year, month, day);
+            const metric = metrics.get(date) || {};
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'calendar-day';
+            button.setAttribute('role', 'gridcell');
+            button.setAttribute('aria-label', `${day} de ${monthNames[month]} de ${year}`);
+            button.textContent = day;
+            if (date === todayKey) button.classList.add('calendar-day-today');
+            if (date === selectedDate) button.classList.add('calendar-day-selected');
+            if (metric.has_notes) button.classList.add('calendar-day-note');
+            if (metric.is_blocked) button.classList.add('calendar-day-blocked');
+            button.addEventListener('click', () => {
+                selectedDate = date;
+                renderCalendar(days);
+                loadDayDetails(date);
+            });
+            grid.appendChild(button);
+        }
+    }
+
+    async function loadMonth() {
+        const year = viewedMonth.getFullYear();
+        const month = viewedMonth.getMonth() + 1;
+        status.textContent = 'Carregando calendario...';
+        try {
+            const response = await fetch(`/calendar_summary?year=${year}&month=${month}`, {
+                credentials: 'same-origin'
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) throw new Error(data.erro || 'Nao foi possivel carregar o calendario.');
+            renderCalendar(data.days || []);
+            if (selectedDate) loadDayDetails(selectedDate);
+            status.textContent = '';
+        } catch (error) {
+            grid.innerHTML = '';
+            details.innerHTML = '';
+            details.appendChild(makeElement('div', 'calendar-details-empty', 'Nao foi possivel carregar os detalhes enquanto o calendario esta indisponivel.'));
+            status.textContent = error.message;
+            label.textContent = `${monthNames[viewedMonth.getMonth()]} ${viewedMonth.getFullYear()}`;
+        }
+    }
+
+    document.getElementById('calendar-prev').addEventListener('click', () => {
+        viewedMonth = new Date(viewedMonth.getFullYear(), viewedMonth.getMonth() - 1, 1);
+        selectedDate = '';
+        resetDayDetails('Selecione uma data para ver os detalhes do dia.');
+        loadMonth();
+    });
+    document.getElementById('calendar-next').addEventListener('click', () => {
+        viewedMonth = new Date(viewedMonth.getFullYear(), viewedMonth.getMonth() + 1, 1);
+        selectedDate = '';
+        resetDayDetails('Selecione uma data para ver os detalhes do dia.');
+        loadMonth();
+    });
+    document.getElementById('calendar-today').addEventListener('click', () => {
+        viewedMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        selectedDate = isoDate(today.getFullYear(), today.getMonth(), today.getDate());
+        loadMonth();
+    });
+
+    if (tipoBloqueio) {
+        tipoBloqueio.addEventListener('change', atualizarCamposBloqueio);
+        atualizarCamposBloqueio();
+    }
+
+    selectedDate = isoDate(today.getFullYear(), today.getMonth(), today.getDate());
+    loadMonth();
+})();
+</script>
 </body>
 </html>
