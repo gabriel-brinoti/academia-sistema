@@ -72,6 +72,7 @@
     let viewedMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     let selectedDate = '';
     let monthMetrics = new Map();
+    const quickNoteRequested = new URLSearchParams(window.location.search).get('nova_anotacao') === '1';
 
     function isoDate(year, month, day) {
         return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -139,6 +140,15 @@
         details.appendChild(button);
     }
 
+    function renderQuickNote(date) {
+        selectedDate = date;
+        details.innerHTML = '';
+        const header = makeElement('div', 'calendar-details-header');
+        header.appendChild(makeElement('h4', '', `Nova anotacao - ${formatDate(date)}`));
+        details.appendChild(header);
+        details.appendChild(renderNoteForm(date));
+    }
+
     function renderNoteForm(date, note) {
         const form = makeElement('form', 'calendar-note-form');
         form.dataset.noteId = note ? note.id : '';
@@ -159,7 +169,7 @@
         actions.appendChild(save);
         const cancel = makeElement('button', 'calendar-note-cancel', 'Cancelar');
         cancel.type = 'button';
-        cancel.addEventListener('click', () => loadDayDetails(date));
+        cancel.addEventListener('click', () => renderSelectedDay(date));
         actions.appendChild(cancel);
         form.appendChild(title);
         form.appendChild(description);
@@ -395,7 +405,13 @@
         loadMonth().then(() => renderSelectedDay(selectedDate));
     });
 
-    loadMonth();
+    loadMonth().then(() => {
+        if (!quickNoteRequested) return;
+        const todayKey = isoDate(today.getFullYear(), today.getMonth(), today.getDate());
+        selectedDate = todayKey;
+        renderCalendar(Array.from(monthMetrics.values()));
+        renderQuickNote(todayKey);
+    });
 })();
 </script>
 </body>
