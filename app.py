@@ -296,6 +296,10 @@ TABELAS_BACKUP = {
     "bloqueios_aulas": [
         "data_bloqueio", "horario_inicio", "horario_fim", "tipo", "modalidade", "motivo"
     ],
+    "experimental_bookings": [
+        "id", "aula_id", "data_agendamento", "nome", "telefone", "status",
+        "criado_em", "criado_por", "cancelado_em", "cancelado_por"
+    ],
 }
 
 
@@ -328,7 +332,7 @@ def inserir_linhas_backup(cursor, tabela, colunas, linhas):
 
 
 def resetar_sequence(cursor, tabela):
-    if tabela not in ("alunos", "aulas", "agendamentos"):
+    if tabela not in ("alunos", "aulas", "agendamentos", "experimental_bookings"):
         return
 
     cursor.execute(f"""
@@ -438,6 +442,20 @@ def contar_aulas_usadas(cursor, aluno_id, data_inicio=None):
         """, (aluno_id,))
 
     return cursor.fetchone()["total"]
+
+
+def contar_ocupacao_aula(cursor, aula_id, data_agendamento):
+    cursor.execute("""
+        SELECT
+            (SELECT COUNT(*) FROM agendamentos
+             WHERE aula_id = %s AND data_agendamento = %s
+               AND COALESCE(status, 'ATIVO') = 'ATIVO')
+            +
+            (SELECT COUNT(*) FROM experimental_bookings
+             WHERE aula_id = %s AND data_agendamento = %s
+               AND COALESCE(status, 'ATIVO') = 'ATIVO') AS total
+    """, (aula_id, data_agendamento, aula_id, data_agendamento))
+    return int(cursor.fetchone()["total"] or 0)
 
 
 def resumo_aulas_mes(cursor, aluno_id, plano):
@@ -765,6 +783,31 @@ def init_db():
     """)
 
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS experimental_bookings (
+            id SERIAL PRIMARY KEY,
+            aula_id INTEGER,
+            data_agendamento TEXT,
+            nome TEXT,
+            telefone TEXT,
+            status TEXT DEFAULT 'ATIVO',
+            criado_em TEXT,
+            criado_por TEXT,
+            cancelado_em TEXT,
+            cancelado_por TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_experimental_bookings_data_aula
+        ON experimental_bookings (data_agendamento, aula_id)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_experimental_bookings_status
+        ON experimental_bookings (status)
+    """)
+
+    cursor.execute("""
         ALTER TABLE agendamentos ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ATIVO'
     """)
 
@@ -1075,7 +1118,14 @@ def listar_aulas_do_dia(dia_semana=None, cursor=None, data_agendamento=None):
             a.horario, 
             a.modalidade, 
             a.capacidade,
-            COUNT(ag.id) AS ocupadas
+            COUNT(ag.id) AS alunos_ativos,
+            (
+                SELECT COUNT(*)
+                FROM experimental_bookings eb
+                WHERE eb.aula_id = a.id
+                  AND eb.data_agendamento = %s
+                  AND COALESCE(eb.status, 'ATIVO') = 'ATIVO'
+            ) AS experimentais_ativos
         FROM aulas a
         LEFT JOIN agendamentos ag 
             ON ag.aula_id = a.id 
@@ -1084,7 +1134,7 @@ def listar_aulas_do_dia(dia_semana=None, cursor=None, data_agendamento=None):
         WHERE a.dia_semana = %s
         GROUP BY a.id, a.dia_semana, a.horario, a.modalidade, a.capacidade
         ORDER BY a.horario
-    """, (hoje, dia_semana))
+    """, (hoje, hoje, dia_semana))
     aulas = cursor.fetchall()
     bloqueios = obter_bloqueios_aulas(cursor, hoje)
 
@@ -1108,12 +1158,32 @@ def listar_aulas_do_dia(dia_semana=None, cursor=None, data_agendamento=None):
             "idade": calcular_idade(inscrito["data_nascimento"])
         })
 
+    cursor.execute("""
+        SELECT id, aula_id, nome, telefone
+        FROM experimental_bookings
+        WHERE data_agendamento = %s
+          AND COALESCE(status, 'ATIVO') = 'ATIVO'
+        ORDER BY nome ASC
+    """, (hoje,))
+    experimentais_por_aula = {}
+    for experimental in cursor.fetchall():
+        experimentais_por_aula.setdefault(experimental["aula_id"], []).append({
+            "id": experimental["id"],
+            "nome": experimental["nome"],
+            "telefone": experimental["telefone"]
+        })
+
     dados = []
     for aula in aulas:
-        ocupadas = aula["ocupadas"] or 0
+        alunos_ativos = aula["alunos_ativos"] or 0
+        experimentais_ativos = aula["experimentais_ativos"] or 0
+        ocupadas = alunos_ativos + experimentais_ativos
         capacidade = aula["capacidade"] or 10
 
         item = dict(aula)
+        item["ocupadas"] = ocupadas
+        item["alunos_ativos"] = alunos_ativos
+        item["experimentais_ativos"] = experimentais_ativos
         item["restantes"] = max(capacidade - ocupadas, 0)
         item["percentual"] = int((ocupadas / capacidade) * 100) if capacidade else 0
         item["lotada"] = ocupadas >= capacidade
@@ -1124,6 +1194,7 @@ def listar_aulas_do_dia(dia_semana=None, cursor=None, data_agendamento=None):
         item["motivo_bloqueio"] = bloqueio["motivo"] if bloqueio else None
         item["tipo_bloqueio"] = bloqueio["tipo"] if bloqueio else None
         item["inscritos"] = inscritos_por_aula.get(aula["id"], [])
+        item["experimentais"] = experimentais_por_aula.get(aula["id"], [])
         dados.append(item)
 
     if conn:
@@ -1479,13 +1550,16 @@ def calendar_schedule():
             "modalidade": aula["modalidade"],
             "capacidade": int(aula["capacidade"] or 0),
             "active_count": int(aula["ocupadas"] or 0),
+            "student_count": int(aula["alunos_ativos"] or 0),
+            "experimental_count": int(aula["experimentais_ativos"] or 0),
             "available_count": int(aula["restantes"] or 0),
             "is_full": bool(aula["lotada"]),
             "is_blocked": bool(aula["bloqueada"]),
             "block_reason": aula["motivo_bloqueio"],
             "block_type": aula["tipo_bloqueio"],
             "block_start": aula["horario_bloqueio"],
-            "block_end": aula["horario_fim_bloqueio"]
+            "block_end": aula["horario_fim_bloqueio"],
+            "experimentals": aula["experimentais"]
         })
 
     return jsonify({
@@ -1494,6 +1568,108 @@ def calendar_schedule():
         "weekday": dia_semana,
         "classes": cronograma
     })
+
+
+@app.route("/experimental_bookings", methods=["POST"])
+def criar_experimental_booking():
+    if "admin_logado" not in session:
+        return erro_json("Acesso restrito ao admin.", 403)
+
+    dados = request.get_json(silent=True) or request.form
+    nome = " ".join(str(dados.get("nome", "")).split())
+    telefone = " ".join(str(dados.get("telefone", "")).split())
+    data_agendamento = str(dados.get("date", "")).strip()
+    try:
+        aula_id = int(dados.get("aula_id"))
+    except (TypeError, ValueError):
+        return erro_json("Aula invalida.")
+
+    if not nome:
+        return erro_json("Nome obrigatorio.")
+    if not data_iso_valida(data_agendamento):
+        return erro_json("Data invalida. Use o formato YYYY-MM-DD.")
+
+    data_escolhida = datetime.strptime(data_agendamento, "%Y-%m-%d").date()
+    if data_escolhida < data_hoje_brasil():
+        return erro_json("Nao e permitido agendar experimental em data passada.")
+
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM aulas WHERE id = %s FOR UPDATE", (aula_id,))
+        aula = cursor.fetchone()
+        if not aula:
+            conn.rollback()
+            return erro_json("Aula nao encontrada.", 404)
+        if aula["dia_semana"] != obter_dia_semana(data_escolhida):
+            conn.rollback()
+            return erro_json("A aula escolhida nao pertence a esta data.")
+
+        bloqueios = obter_bloqueios_aulas(cursor, data_agendamento)
+        bloqueio = obter_bloqueio_para_aula(aula, bloqueios)
+        if aula_bloqueada_por_horario(aula, bloqueio):
+            conn.rollback()
+            return erro_json("Esta aula esta bloqueada para a data escolhida.", 409)
+
+        ocupadas = contar_ocupacao_aula(cursor, aula_id, data_agendamento)
+        if ocupadas >= int(aula["capacidade"] or 0):
+            conn.rollback()
+            return erro_json("Esta aula ja atingiu o limite de vagas.", 409)
+
+        agora = agora_brasil_texto()
+        cursor.execute("""
+            INSERT INTO experimental_bookings (
+                aula_id, data_agendamento, nome, telefone, status,
+                criado_em, criado_por
+            )
+            VALUES (%s, %s, %s, %s, 'ATIVO', %s, 'admin')
+            RETURNING id
+        """, (aula_id, data_agendamento, nome, telefone or None, agora))
+        experimental_id = cursor.fetchone()["id"]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return jsonify({
+        "ok": True,
+        "experimental": {
+            "id": experimental_id,
+            "aula_id": aula_id,
+            "date": data_agendamento,
+            "nome": nome,
+            "telefone": telefone or None,
+            "status": "ATIVO"
+        }
+    }), 201
+
+
+@app.route("/experimental_bookings/<int:experimental_id>/cancel", methods=["POST"])
+def cancelar_experimental_booking(experimental_id):
+    if "admin_logado" not in session:
+        return erro_json("Acesso restrito ao admin.", 403)
+
+    agora = agora_brasil_texto()
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE experimental_bookings
+        SET status = 'CANCELADO',
+            cancelado_em = %s,
+            cancelado_por = 'admin'
+        WHERE id = %s
+          AND COALESCE(status, 'ATIVO') = 'ATIVO'
+        RETURNING id
+    """, (agora, experimental_id))
+    cancelado = cursor.fetchone()
+    conn.commit()
+    conn.close()
+
+    if not cancelado:
+        return erro_json("Agendamento experimental nao encontrado.", 404)
+    return jsonify({"ok": True, "id": experimental_id, "status": "CANCELADO"})
 
 
 @app.route("/calendar_summary", methods=["GET"])
@@ -1667,12 +1843,13 @@ def restaurar_backup():
         conn = conectar()
         cursor = conn.cursor()
 
+        cursor.execute("DELETE FROM experimental_bookings")
         cursor.execute("DELETE FROM agendamentos")
         cursor.execute("DELETE FROM bloqueios_aulas")
         cursor.execute("DELETE FROM aulas")
         cursor.execute("DELETE FROM alunos")
 
-        for tabela in ("alunos", "aulas", "agendamentos", "bloqueios_aulas"):
+        for tabela in ("alunos", "aulas", "agendamentos", "bloqueios_aulas", "experimental_bookings"):
             if tabela not in abas:
                 continue
 
@@ -1684,7 +1861,7 @@ def restaurar_backup():
             if colunas:
                 inserir_linhas_backup(cursor, tabela, colunas, df)
 
-        for tabela in ("alunos", "aulas", "agendamentos"):
+        for tabela in ("alunos", "aulas", "agendamentos", "experimental_bookings"):
             resetar_sequence(cursor, tabela)
 
         atualizar_status_vencidos(cursor)
@@ -2254,15 +2431,7 @@ def agendar_aula(aula_id):
             mensagem="A academia tera fechamento especial neste dia. Esta aula nao esta disponivel para agendamento."
         )
 
-    # vagas ocupadas
-    cursor.execute("""
-        SELECT COUNT(*) AS total
-        FROM agendamentos
-        WHERE aula_id = %s
-          AND data_agendamento = %s
-          AND COALESCE(status, 'ATIVO') = 'ATIVO'
-    """, (aula_id, data_agendamento))
-    ocupadas = cursor.fetchone()["total"]
+    ocupadas = contar_ocupacao_aula(cursor, aula_id, data_agendamento)
 
     aulas_usadas_sistema = contar_aulas_usadas(cursor, aluno_id, aluno["data_inicio"])
     aulas_usadas_total = aulas_usadas_sistema + (aluno["aulas_usadas_iniciais"] or 0)
@@ -2419,6 +2588,18 @@ def aceitar_contrato():
             "mensagem.html",
             titulo="Aula bloqueada",
             mensagem="A academia tera fechamento especial neste dia. Esta aula nao esta disponivel para agendamento."
+        )
+
+    ocupadas = contar_ocupacao_aula(cursor, aula_id, data_agendamento)
+    if ocupadas >= int(aula["capacidade"] or 0):
+        conn.rollback()
+        conn.close()
+        session.pop("aluno_pendente_contrato", None)
+        session.pop("aula_pendente_contrato", None)
+        return render_template(
+            "mensagem.html",
+            titulo="Aula lotada",
+            mensagem="Esta aula ja atingiu o limite de vagas disponiveis."
         )
 
     cursor.execute("""

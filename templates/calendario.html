@@ -126,6 +126,70 @@
         return totals;
     }
 
+    function renderExperimentalForm(aula, date, target) {
+        const form = makeElement('form', 'experimental-form');
+        const title = makeElement('strong', '', `Agendar experimental - ${aula.modalidade} ${aula.horario}`);
+        const name = makeElement('input', '');
+        name.type = 'text';
+        name.name = 'nome';
+        name.placeholder = 'Nome do experimental';
+        name.required = true;
+        const phone = makeElement('input', '');
+        phone.type = 'tel';
+        phone.name = 'telefone';
+        phone.placeholder = 'Telefone (opcional)';
+        const actions = makeElement('div', 'experimental-form-actions');
+        const cancel = makeElement('button', 'calendar-note-cancel', 'Cancelar');
+        cancel.type = 'button';
+        cancel.addEventListener('click', () => renderSelectedDay(date));
+        const save = makeElement('button', '', 'Agendar');
+        save.type = 'submit';
+        actions.appendChild(cancel);
+        actions.appendChild(save);
+        form.appendChild(title);
+        form.appendChild(name);
+        form.appendChild(phone);
+        form.appendChild(actions);
+        form.addEventListener('submit', (event) => saveExperimental(event, aula.aula_id, date));
+        target.replaceChildren(form);
+        name.focus();
+    }
+
+    async function saveExperimental(event, aulaId, date) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const submit = form.querySelector('button[type="submit"]');
+        submit.disabled = true;
+        submit.textContent = 'Agendando...';
+        try {
+            await fetchJson('/experimental_bookings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    aula_id: aulaId,
+                    date,
+                    nome: form.elements.nome.value,
+                    telefone: form.elements.telefone.value
+                })
+            });
+            renderSelectedDay(date);
+        } catch (error) {
+            alert(error.message);
+            submit.disabled = false;
+            submit.textContent = 'Agendar';
+        }
+    }
+
+    async function cancelExperimental(experimentalId, date) {
+        if (!confirm('Cancelar este agendamento experimental?')) return;
+        try {
+            await fetchJson(`/experimental_bookings/${experimentalId}/cancel`, { method: 'POST' });
+            renderSelectedDay(date);
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
     function renderSchedule(schedule, container) {
         container.innerHTML = '';
         container.appendChild(makeElement('h4', '', `Aulas do dia - ${schedule.weekday}`));
@@ -145,11 +209,38 @@
 
             const occupancy = `${aula.active_count} / ${aula.capacidade} alunos - ${aula.available_count} vagas disponiveis`;
             item.appendChild(makeElement('p', '', occupancy));
+            if (aula.experimental_count) {
+                item.appendChild(makeElement('small', '', `${aula.student_count} alunos cadastrados + ${aula.experimental_count} experimentais`));
+            }
+
+            const experimentals = aula.experimentals || [];
+            if (experimentals.length) {
+                const experimentalList = makeElement('div', 'experimental-list');
+                experimentals.forEach((experimental) => {
+                    const row = makeElement('div', 'experimental-row');
+                    const contact = experimental.telefone ? ` - ${experimental.telefone}` : '';
+                    row.appendChild(makeElement('span', '', `Experimental: ${experimental.nome}${contact}`));
+                    const remove = makeElement('button', 'experimental-cancel', 'Cancelar');
+                    remove.type = 'button';
+                    remove.addEventListener('click', () => cancelExperimental(experimental.id, schedule.date));
+                    row.appendChild(remove);
+                    experimentalList.appendChild(row);
+                });
+                item.appendChild(experimentalList);
+            }
+
             if (aula.is_blocked) {
                 item.appendChild(makeElement('strong', 'calendar-schedule-blocked', 'Bloqueada'));
                 if (aula.block_reason) item.appendChild(makeElement('small', '', `Motivo: ${aula.block_reason}`));
             } else if (aula.is_full) {
                 item.appendChild(makeElement('strong', 'calendar-schedule-full', 'Lotada'));
+            } else {
+                const action = makeElement('div', 'experimental-action');
+                const add = makeElement('button', 'experimental-add', '+ Agendar experimental');
+                add.type = 'button';
+                add.addEventListener('click', () => renderExperimentalForm(aula, schedule.date, action));
+                action.appendChild(add);
+                item.appendChild(action);
             }
             list.appendChild(item);
         });

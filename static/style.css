@@ -629,6 +629,75 @@ tr:hover td {
     margin-top: 4px;
 }
 
+.experimental-action,
+.experimental-list {
+    margin-top: 10px;
+}
+
+.experimental-add,
+.experimental-cancel,
+.experimental-form-actions button {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 6px;
+    background: #111;
+    color: #f4b400;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.experimental-list {
+    display: grid;
+    gap: 6px;
+}
+
+.experimental-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 13px;
+}
+
+.experimental-row span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.experimental-cancel {
+    flex: 0 0 auto;
+    min-height: 30px;
+    background: #8f8f8f;
+    color: #fff;
+}
+
+.experimental-form {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e3e3e3;
+}
+
+.experimental-form input {
+    width: 100%;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid #d8d8d8;
+    border-radius: 6px;
+    font: inherit;
+}
+
+.experimental-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 .calendar-header {
     display: flex;
     align-items: center;
@@ -978,4 +1047,8 @@ tr:hover td {
     .calendar-note-form-actions button,
     .calendar-note-new,
     .calendar-details-button { width: 100%; }
+    .experimental-row { align-items: flex-start; flex-direction: column; }
+    .experimental-cancel,
+    .experimental-add,
+    .experimental-form-actions button { width: 100%; }
 }
