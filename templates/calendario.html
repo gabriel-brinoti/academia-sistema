@@ -126,6 +126,48 @@
         return totals;
     }
 
+    function renderSchedule(schedule, container) {
+        container.innerHTML = '';
+        container.appendChild(makeElement('h4', '', `Aulas do dia - ${schedule.weekday}`));
+        const classes = schedule.classes || [];
+        if (!classes.length) {
+            container.appendChild(makeElement('div', 'calendar-details-empty', 'Nao ha aulas cadastradas para esta data.'));
+            return;
+        }
+
+        const list = makeElement('div', 'calendar-schedule-list');
+        classes.forEach((aula) => {
+            const item = makeElement('article', `calendar-schedule-item${aula.is_blocked ? ' is-blocked' : ''}`);
+            const heading = makeElement('div', 'calendar-schedule-heading');
+            heading.appendChild(makeElement('strong', '', aula.modalidade));
+            heading.appendChild(makeElement('span', '', aula.horario));
+            item.appendChild(heading);
+
+            const occupancy = `${aula.active_count} / ${aula.capacidade} alunos - ${aula.available_count} vagas disponiveis`;
+            item.appendChild(makeElement('p', '', occupancy));
+            if (aula.is_blocked) {
+                item.appendChild(makeElement('strong', 'calendar-schedule-blocked', 'Bloqueada'));
+                if (aula.block_reason) item.appendChild(makeElement('small', '', `Motivo: ${aula.block_reason}`));
+            } else if (aula.is_full) {
+                item.appendChild(makeElement('strong', 'calendar-schedule-full', 'Lotada'));
+            }
+            list.appendChild(item);
+        });
+        container.appendChild(list);
+    }
+
+    async function loadSchedule(date, container) {
+        try {
+            const schedule = await fetchJson(`/calendar_schedule?date=${date}`);
+            if (selectedDate !== date) return;
+            renderSchedule(schedule, container);
+        } catch (error) {
+            if (selectedDate !== date) return;
+            container.innerHTML = '';
+            container.appendChild(makeElement('div', 'calendar-details-empty', error.message));
+        }
+    }
+
     function renderSelectedDay(date) {
         const metric = monthMetrics.get(date) || {};
         details.innerHTML = '';
@@ -133,6 +175,11 @@
         header.appendChild(makeElement('h4', '', formatDate(date)));
         header.appendChild(summaryBoxes(metric));
         details.appendChild(header);
+
+        const schedule = makeElement('section', 'calendar-schedule-section');
+        schedule.appendChild(makeElement('div', 'calendar-details-empty', 'Carregando aulas do dia...'));
+        details.appendChild(schedule);
+        loadSchedule(date, schedule);
 
         const button = makeElement('button', 'calendar-details-button', 'Ver detalhes do dia');
         button.type = 'button';

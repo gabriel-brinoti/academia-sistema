@@ -1035,8 +1035,9 @@ def obter_data_cronograma_formatada():
     data_base = obter_data_base()
     return data_base.strftime("%d/%m/%Y")
 
-def obter_dia_semana():
-    data_base = obter_data_base()
+def obter_dia_semana(data_base=None):
+    if data_base is None:
+        data_base = obter_data_base()
 
     mapa = {
         0: "Segunda-feira",
@@ -1051,16 +1052,20 @@ def obter_dia_semana():
     return mapa[data_base.weekday()]
 
 
-def listar_aulas_do_dia(dia_semana=None, cursor=None):
+def listar_aulas_do_dia(dia_semana=None, cursor=None, data_agendamento=None):
+    if data_agendamento:
+        data_base = datetime.strptime(data_agendamento, "%Y-%m-%d").date()
+    else:
+        data_base = obter_data_base()
+
     if not dia_semana:
-        dia_semana = obter_dia_semana()
+        dia_semana = obter_dia_semana(data_base)
 
     conn = None
     if cursor is None:
         conn = conectar()
         cursor = conn.cursor()
 
-    data_base = obter_data_base()
     hoje = data_base.strftime("%Y-%m-%d")
 
     cursor.execute("""
@@ -1445,6 +1450,49 @@ def calendar_history():
             "cancelled_bookings": cancelled_bookings
         },
         "classes": list(aulas_por_id.values())
+    })
+
+
+@app.route("/calendar_schedule", methods=["GET"])
+def calendar_schedule():
+    if "admin_logado" not in session:
+        return erro_json("Acesso restrito ao admin.", 403)
+
+    data_cronograma = request.args.get("date", "").strip()
+    if not data_iso_valida(data_cronograma):
+        return erro_json("Data invalida. Use o formato YYYY-MM-DD.")
+
+    conn = conectar()
+    cursor = conn.cursor()
+    dia_semana, aulas = listar_aulas_do_dia(
+        cursor=cursor,
+        data_agendamento=data_cronograma
+    )
+    conn.close()
+
+    cronograma = []
+    for aula in aulas:
+        cronograma.append({
+            "aula_id": aula["id"],
+            "dia_semana": aula["dia_semana"],
+            "horario": aula["horario"],
+            "modalidade": aula["modalidade"],
+            "capacidade": int(aula["capacidade"] or 0),
+            "active_count": int(aula["ocupadas"] or 0),
+            "available_count": int(aula["restantes"] or 0),
+            "is_full": bool(aula["lotada"]),
+            "is_blocked": bool(aula["bloqueada"]),
+            "block_reason": aula["motivo_bloqueio"],
+            "block_type": aula["tipo_bloqueio"],
+            "block_start": aula["horario_bloqueio"],
+            "block_end": aula["horario_fim_bloqueio"]
+        })
+
+    return jsonify({
+        "ok": True,
+        "date": data_cronograma,
+        "weekday": dia_semana,
+        "classes": cronograma
     })
 
 
