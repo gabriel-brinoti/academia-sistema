@@ -999,6 +999,11 @@ tr:hover td {
     color: #fff !important;
 }
 
+.calendar-note-complete {
+    background: #198754 !important;
+    color: #fff !important;
+}
+
 .calendar-note-new {
     margin-top: 12px;
 }

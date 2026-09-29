@@ -911,6 +911,14 @@ def init_db():
     """)
 
     cursor.execute("""
+        ALTER TABLE calendar_notes ADD COLUMN IF NOT EXISTS completed_at TEXT
+    """)
+
+    cursor.execute("""
+        ALTER TABLE calendar_notes ADD COLUMN IF NOT EXISTS completed_by TEXT
+    """)
+
+    cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_calendar_notes_date
         ON calendar_notes (date)
     """)
@@ -1339,6 +1347,7 @@ def listar_calendar_notes():
             FROM calendar_notes
             WHERE date = %s
               AND deleted_at IS NULL
+              AND completed_at IS NULL
             ORDER BY created_at ASC, id ASC
         """, (data_nota,))
     else:
@@ -1346,6 +1355,7 @@ def listar_calendar_notes():
             SELECT id, date, title, description, created_at, updated_at, created_by
             FROM calendar_notes
             WHERE deleted_at IS NULL
+              AND completed_at IS NULL
             ORDER BY date DESC, created_at ASC, id ASC
         """)
 
@@ -1406,6 +1416,7 @@ def editar_calendar_note(note_id):
             updated_at = %s
         WHERE id = %s
           AND deleted_at IS NULL
+          AND completed_at IS NULL
         RETURNING id, date, title, description, created_at, updated_at, created_by
     """, (titulo, descricao, agora_brasil_texto(), note_id))
     nota = cursor.fetchone()
@@ -1441,6 +1452,44 @@ def excluir_calendar_note(note_id):
     if not nota:
         return erro_json("Anotacao nao encontrada.", 404)
     return jsonify({"ok": True})
+
+
+@app.route("/calendar_notes/<int:note_id>/complete", methods=["POST"])
+def concluir_calendar_note(note_id):
+    if "admin_logado" not in session:
+        return erro_json("Acesso restrito ao admin.", 403)
+
+    agora = agora_brasil_texto()
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE calendar_notes
+        SET completed_at = %s,
+            completed_by = %s,
+            updated_at = %s
+        WHERE id = %s
+          AND deleted_at IS NULL
+          AND completed_at IS NULL
+        RETURNING id, completed_at, completed_by
+    """, (agora, "admin", agora, note_id))
+    nota = cursor.fetchone()
+
+    if not nota:
+        cursor.execute("""
+            SELECT id, completed_at, completed_by
+            FROM calendar_notes
+            WHERE id = %s
+              AND deleted_at IS NULL
+              AND completed_at IS NOT NULL
+        """, (note_id,))
+        nota = cursor.fetchone()
+
+    conn.commit()
+    conn.close()
+
+    if not nota:
+        return erro_json("Anotacao nao encontrada.", 404)
+    return jsonify({"ok": True, "note": nota})
 
 
 @app.route("/calendar_history", methods=["GET"])
