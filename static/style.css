@@ -1061,6 +1061,28 @@ tr:hover td {
     text-transform: uppercase;
 }
 
+.notes-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0 18px;
+}
+
+.notes-tab {
+    min-height: 42px;
+    padding: 0 18px;
+    border: 1px solid #111;
+    border-radius: 6px;
+    background: #fff;
+    color: #111;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.notes-tab.is-active {
+    background: #111;
+    color: #f4b400;
+}
+
 .notes-date-group .calendar-note-item:last-child {
     border-bottom: 0;
 }
@@ -1084,6 +1106,8 @@ tr:hover td {
     .calendar-note-form-actions button,
     .calendar-note-new,
     .calendar-details-button { width: 100%; }
+    .notes-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+    .notes-tab { width: 100%; padding: 0 8px; }
     .experimental-row { align-items: flex-start; flex-direction: column; }
     .experimental-cancel,
     .experimental-add,

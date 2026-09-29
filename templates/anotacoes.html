@@ -43,7 +43,11 @@
     </section>
 
     <div id="notes-status" class="calendar-status" role="status"></div>
-    <h3 class="notes-list-title">Pendentes</h3>
+    <div class="notes-tabs" role="tablist" aria-label="Tipo de anotacao">
+        <button type="button" class="notes-tab is-active" id="pending-tab" role="tab" aria-selected="true">Pendentes</button>
+        <button type="button" class="notes-tab" id="archived-tab" role="tab" aria-selected="false">Arquivadas</button>
+    </div>
+    <h3 class="notes-list-title" id="notes-list-title">Pendentes</h3>
     <section id="notes-list" class="notes-date-list" aria-live="polite"></section>
 </main>
 
@@ -54,7 +58,11 @@
     const editor = document.getElementById('notes-editor');
     const editorTitle = document.getElementById('notes-editor-title');
     const form = document.getElementById('note-form');
+    const pendingTab = document.getElementById('pending-tab');
+    const archivedTab = document.getElementById('archived-tab');
+    const listTitle = document.getElementById('notes-list-title');
     let editingId = null;
+    let currentView = 'pending';
 
     function todayIso() {
         const now = new Date();
@@ -100,6 +108,7 @@
     }
 
     function openEditor(note = null) {
+        if (currentView !== 'pending') setView('pending');
         editingId = note ? note.id : null;
         editorTitle.textContent = note ? 'Editar anotacao' : 'Nova anotacao';
         form.elements.date.value = note ? note.date : todayIso();
@@ -114,7 +123,10 @@
     function renderNotes(notes) {
         list.innerHTML = '';
         if (!notes.length) {
-            list.appendChild(makeElement('div', 'calendar-details-empty', 'Nenhuma anotacao pendente.'));
+            const emptyText = currentView === 'archived'
+                ? 'Nenhuma anotacao arquivada.'
+                : 'Nenhuma anotacao pendente.';
+            list.appendChild(makeElement('div', 'calendar-details-empty', emptyText));
             return;
         }
         const groups = new Map();
@@ -127,10 +139,11 @@
             group.appendChild(makeElement('h3', '', formatDate(date)));
             dateNotes.forEach((note) => {
                 const item = makeElement('article', 'calendar-note-item');
-                item.appendChild(makeElement('strong', '', note.title));
+                const title = currentView === 'archived' ? `Concluida: ${note.title}` : note.title;
+                item.appendChild(makeElement('strong', '', title));
                 const description = makeElement('p', 'calendar-note-description', note.description || '');
                 item.appendChild(description);
-                if ((note.description || '').length > 260) {
+                if (currentView === 'pending' && (note.description || '').length > 260) {
                     description.classList.add('calendar-note-collapsed');
                     const toggle = makeElement('button', 'calendar-note-toggle', 'Ver mais');
                     toggle.type = 'button';
@@ -139,6 +152,12 @@
                         toggle.textContent = collapsed ? 'Ver mais' : 'Ver menos';
                     });
                     item.appendChild(toggle);
+                }
+                if (currentView === 'archived') {
+                    item.appendChild(makeElement('small', '', `Concluida em: ${formatDateTime(note.completed_at)}`));
+                    item.appendChild(makeElement('small', '', `Por: ${note.completed_by || 'admin'}`));
+                    group.appendChild(item);
+                    return;
                 }
                 item.appendChild(makeElement('small', '', `Atualizada ${formatDateTime(note.updated_at)}`));
                 const actions = makeElement('div', 'calendar-note-actions');
@@ -160,14 +179,28 @@
     }
 
     async function loadNotes() {
-        status.textContent = 'Carregando anotacoes...';
+        status.textContent = currentView === 'archived'
+            ? 'Carregando anotacoes arquivadas...'
+            : 'Carregando anotacoes pendentes...';
         try {
-            const data = await fetchJson('/calendar_notes');
+            const data = await fetchJson(`/calendar_notes?status=${currentView}`);
             renderNotes(data.notes || []);
             status.textContent = '';
         } catch (error) {
             status.textContent = error.message;
         }
+    }
+
+    function setView(view) {
+        currentView = view;
+        closeEditor();
+        const archived = view === 'archived';
+        pendingTab.classList.toggle('is-active', !archived);
+        archivedTab.classList.toggle('is-active', archived);
+        pendingTab.setAttribute('aria-selected', String(!archived));
+        archivedTab.setAttribute('aria-selected', String(archived));
+        listTitle.textContent = archived ? 'Arquivadas' : 'Pendentes';
+        loadNotes();
     }
 
     async function deleteNote(noteId) {
@@ -219,6 +252,8 @@
 
     document.getElementById('new-note').addEventListener('click', () => openEditor());
     document.getElementById('cancel-note').addEventListener('click', closeEditor);
+    pendingTab.addEventListener('click', () => setView('pending'));
+    archivedTab.addEventListener('click', () => setView('archived'));
     if (new URLSearchParams(window.location.search).get('nova') === '1') openEditor();
     loadNotes();
 })();

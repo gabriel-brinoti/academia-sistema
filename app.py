@@ -1335,33 +1335,39 @@ def listar_calendar_notes():
         return erro_json("Acesso restrito ao admin.", 403)
 
     data_nota = request.args.get("date", "").strip()
+    estado = request.args.get("status", "pending").strip().lower()
     if data_nota and not data_iso_valida(data_nota):
         return erro_json("Data invalida. Use o formato YYYY-MM-DD.")
+    if estado not in ("pending", "archived"):
+        return erro_json("Status invalido. Use pending ou archived.")
 
     conn = conectar()
     cursor = conn.cursor()
+    filtro_estado = "completed_at IS NOT NULL" if estado == "archived" else "completed_at IS NULL"
 
     if data_nota:
-        cursor.execute("""
-            SELECT id, date, title, description, created_at, updated_at, created_by
+        cursor.execute(f"""
+            SELECT id, date, title, description, created_at, updated_at, created_by,
+                   completed_at, completed_by
             FROM calendar_notes
             WHERE date = %s
               AND deleted_at IS NULL
-              AND completed_at IS NULL
+              AND {filtro_estado}
             ORDER BY created_at ASC, id ASC
         """, (data_nota,))
     else:
-        cursor.execute("""
-            SELECT id, date, title, description, created_at, updated_at, created_by
+        cursor.execute(f"""
+            SELECT id, date, title, description, created_at, updated_at, created_by,
+                   completed_at, completed_by
             FROM calendar_notes
             WHERE deleted_at IS NULL
-              AND completed_at IS NULL
+              AND {filtro_estado}
             ORDER BY date DESC, created_at ASC, id ASC
         """)
 
     notas = cursor.fetchall()
     conn.close()
-    return jsonify({"ok": True, "notes": notas})
+    return jsonify({"ok": True, "status": estado, "notes": notas})
 
 
 @app.route("/calendar_notes", methods=["POST"])
