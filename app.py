@@ -1346,7 +1346,7 @@ def listar_calendar_notes():
             SELECT id, date, title, description, created_at, updated_at, created_by
             FROM calendar_notes
             WHERE deleted_at IS NULL
-            ORDER BY date ASC, created_at ASC, id ASC
+            ORDER BY date DESC, created_at ASC, id ASC
         """)
 
     notas = cursor.fetchall()
