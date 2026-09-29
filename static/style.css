@@ -1028,6 +1028,33 @@ tr:hover td {
     color: #fff !important;
 }
 
+.notes-page {
+    max-width: 900px;
+}
+
+.notes-editor,
+.notes-date-group {
+    margin-bottom: 18px;
+    padding: 18px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.notes-editor h3,
+.notes-date-group h3 {
+    margin: 0 0 14px;
+}
+
+.notes-date-list {
+    display: grid;
+    gap: 14px;
+}
+
+.notes-date-group .calendar-note-item:last-child {
+    border-bottom: 0;
+}
+
 @media (max-width: 600px) {
     .calendar-page-heading { align-items: stretch; flex-direction: column; }
     .calendar-page-heading .btn { width: 100%; text-align: center; }

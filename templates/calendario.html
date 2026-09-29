@@ -19,6 +19,7 @@
     <div class="navbar-links">
         <a href="{{ url_for('dashboard') }}">Dashboard</a>
         <a href="{{ url_for('alunos') }}">Alunos</a>
+        <a href="{{ url_for('anotacoes_admin') }}">Anotacoes</a>
         <a href="{{ url_for('logout') }}">Sair</a>
     </div>
 </div>
@@ -27,7 +28,7 @@
     <div class="calendar-page-heading">
         <div>
             <h2 class="section-title">Calendario</h2>
-            <p class="subtitulo">Consulte o movimento, as anotacoes e os bloqueios por dia.</p>
+            <p class="subtitulo">Consulte aulas, vagas, bloqueios e experimentais por dia.</p>
         </div>
         <a class="btn" href="{{ url_for('dashboard') }}">Voltar ao dashboard</a>
     </div>
@@ -48,7 +49,6 @@
         </div>
         <div id="calendar-grid" class="calendar-grid" role="grid" aria-label="Dias do mes"></div>
         <div class="calendar-legend">
-            <span><i class="calendar-dot note-dot"></i>Anotacao</span>
             <span><i class="calendar-dot block-dot"></i>Bloqueio</span>
         </div>
     </section>
@@ -72,7 +72,6 @@
     let viewedMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     let selectedDate = '';
     let monthMetrics = new Map();
-    const quickNoteRequested = new URLSearchParams(window.location.search).get('nova_anotacao') === '1';
 
     function isoDate(year, month, day) {
         return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -104,13 +103,6 @@
             throw new Error(data.erro || 'Nao foi possivel concluir a solicitacao.');
         }
         return data;
-    }
-
-    function formatDateTime(value) {
-        if (!value) return '';
-        const parts = String(value).split(' ');
-        if (parts.length < 2) return String(value);
-        return `${formatDate(parts[0])} as ${parts[1].slice(0, 5)}`;
     }
 
     function resetDetails(text) {
@@ -278,87 +270,6 @@
         details.appendChild(button);
     }
 
-    function renderQuickNote(date) {
-        selectedDate = date;
-        details.innerHTML = '';
-        const header = makeElement('div', 'calendar-details-header');
-        header.appendChild(makeElement('h4', '', `Nova anotacao - ${formatDate(date)}`));
-        details.appendChild(header);
-        details.appendChild(renderNoteForm(date));
-    }
-
-    function renderNoteForm(date, note) {
-        const form = makeElement('form', 'calendar-note-form');
-        form.dataset.noteId = note ? note.id : '';
-        const title = makeElement('input', '');
-        title.type = 'text';
-        title.name = 'title';
-        title.placeholder = 'Titulo da anotacao';
-        title.value = note ? note.title : '';
-        title.required = true;
-        const description = makeElement('textarea', '');
-        description.name = 'description';
-        description.placeholder = 'Escreva a anotacao do dia';
-        description.rows = 4;
-        description.value = note ? (note.description || '') : '';
-        const actions = makeElement('div', 'calendar-note-form-actions');
-        const save = makeElement('button', '', note ? 'Salvar' : 'Criar anotacao');
-        save.type = 'submit';
-        actions.appendChild(save);
-        const cancel = makeElement('button', 'calendar-note-cancel', 'Cancelar');
-        cancel.type = 'button';
-        cancel.addEventListener('click', () => renderSelectedDay(date));
-        actions.appendChild(cancel);
-        form.appendChild(title);
-        form.appendChild(description);
-        form.appendChild(actions);
-        form.addEventListener('submit', (event) => saveNote(event, date));
-        return form;
-    }
-
-    function renderNotes(date, notes) {
-        const section = makeElement('section', 'calendar-notes-section');
-        section.appendChild(makeElement('h4', '', 'Anotacoes'));
-        const list = makeElement('div', 'calendar-notes-list');
-        if (!notes.length) {
-            list.appendChild(makeElement('div', 'calendar-details-empty', 'Nenhuma anotacao para esta data.'));
-        }
-        notes.forEach((note) => {
-            const item = makeElement('article', 'calendar-note-item');
-            item.appendChild(makeElement('strong', '', note.title));
-            const description = makeElement('p', 'calendar-note-description', note.description || '');
-            item.appendChild(description);
-            if ((note.description || '').length > 260) {
-                description.classList.add('calendar-note-collapsed');
-                const toggle = makeElement('button', 'calendar-note-toggle', 'Ver mais');
-                toggle.type = 'button';
-                toggle.addEventListener('click', () => {
-                    const collapsed = description.classList.toggle('calendar-note-collapsed');
-                    toggle.textContent = collapsed ? 'Ver mais' : 'Ver menos';
-                });
-                item.appendChild(toggle);
-            }
-            item.appendChild(makeElement('small', '', note.updated_at ? `Atualizada ${formatDateTime(note.updated_at)}` : ''));
-            const actions = makeElement('div', 'calendar-note-actions');
-            const edit = makeElement('button', '', 'Editar');
-            edit.type = 'button';
-            edit.addEventListener('click', () => item.replaceChildren(renderNoteForm(date, note)));
-            const remove = makeElement('button', 'calendar-note-delete', 'Excluir');
-            remove.type = 'button';
-            remove.addEventListener('click', () => deleteNote(note.id, date));
-            actions.appendChild(edit);
-            actions.appendChild(remove);
-            item.appendChild(actions);
-            list.appendChild(item);
-        });
-        section.appendChild(list);
-        const create = makeElement('button', 'calendar-note-new', '+ Nova anotacao');
-        create.type = 'button';
-        create.addEventListener('click', () => create.replaceWith(renderNoteForm(date)));
-        section.appendChild(create);
-        return section;
-    }
-
     function blockTypeLabel(block) {
         if (block.tipo === 'MUSCULACAO') return 'Musculacao';
         if (block.tipo === 'MODALIDADE') return block.modalidade || 'Aula especifica';
@@ -385,7 +296,7 @@
         return section;
     }
 
-    function renderFullDetails(history, notes, blocks) {
+    function renderFullDetails(history, blocks) {
         details.innerHTML = '';
         const header = makeElement('div', 'calendar-details-header');
         header.appendChild(makeElement('h4', '', `Detalhes - ${formatDate(history.date)}`));
@@ -422,57 +333,18 @@
             });
             details.appendChild(list);
         }
-        details.appendChild(renderNotes(history.date, notes));
     }
 
     async function loadDayDetails(date) {
         resetDetails('Carregando detalhes do dia...');
         try {
-            const [history, notes, blocks] = await Promise.all([
+            const [history, blocks] = await Promise.all([
                 fetchJson(`/calendar_history?date=${date}`),
-                fetchJson(`/calendar_notes?date=${date}`),
                 fetchJson(`/calendar_blocks?date=${date}`)
             ]);
-            renderFullDetails(history, notes.notes || [], blocks.blocks || []);
+            renderFullDetails(history, blocks.blocks || []);
         } catch (error) {
             resetDetails(error.message);
-        }
-    }
-
-    async function saveNote(event, date) {
-        event.preventDefault();
-        const form = event.currentTarget;
-        const noteId = form.dataset.noteId;
-        const submit = form.querySelector('button[type="submit"]');
-        submit.disabled = true;
-        submit.textContent = 'Salvando...';
-        try {
-            await fetchJson(noteId ? `/calendar_notes/${noteId}` : '/calendar_notes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    date,
-                    title: form.elements.title.value,
-                    description: form.elements.description.value
-                })
-            });
-            await loadMonth();
-            await loadDayDetails(date);
-        } catch (error) {
-            alert(error.message);
-            submit.disabled = false;
-            submit.textContent = noteId ? 'Salvar' : 'Criar anotacao';
-        }
-    }
-
-    async function deleteNote(noteId, date) {
-        if (!confirm('Excluir esta anotacao?')) return;
-        try {
-            await fetchJson(`/calendar_notes/${noteId}/delete`, { method: 'POST' });
-            await loadMonth();
-            await loadDayDetails(date);
-        } catch (error) {
-            alert(error.message);
         }
     }
 
@@ -499,7 +371,6 @@
             button.setAttribute('aria-label', `${day} de ${monthNames[month]} de ${year}`);
             if (date === todayKey) button.classList.add('calendar-day-today');
             if (date === selectedDate) button.classList.add('calendar-day-selected');
-            if (metric.has_notes) button.classList.add('calendar-day-note');
             if (metric.is_blocked) button.classList.add('calendar-day-blocked');
             button.addEventListener('click', () => {
                 selectedDate = date;
@@ -543,13 +414,7 @@
         loadMonth().then(() => renderSelectedDay(selectedDate));
     });
 
-    loadMonth().then(() => {
-        if (!quickNoteRequested) return;
-        const todayKey = isoDate(today.getFullYear(), today.getMonth(), today.getDate());
-        selectedDate = todayKey;
-        renderCalendar(Array.from(monthMetrics.values()));
-        renderQuickNote(todayKey);
-    });
+    loadMonth();
 })();
 </script>
 </body>

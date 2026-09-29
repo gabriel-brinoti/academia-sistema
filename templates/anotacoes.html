@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anotacoes - DL Fit</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="navbar">
+    <div class="navbar-brand">
+        <img src="{{ url_for('static', filename='logo-dlfit.jpg') }}" alt="Logo DL Fit">
+        <h1>DL FIT - ADM</h1>
+    </div>
+    <div class="navbar-links">
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('calendario_admin') }}">Calendario</a>
+        <a href="{{ url_for('logout') }}">Sair</a>
+    </div>
+</div>
+
+<main class="container notes-page">
+    <div class="calendar-page-heading">
+        <div>
+            <h2 class="section-title">Anotacoes</h2>
+            <p class="subtitulo">Aqui aparecem somente as datas que possuem anotacoes.</p>
+        </div>
+        <button type="button" class="btn" id="new-note">+ Nova anotacao</button>
+    </div>
+
+    <section class="notes-editor" id="notes-editor" hidden>
+        <h3 id="notes-editor-title">Nova anotacao</h3>
+        <form id="note-form" class="calendar-note-form">
+            <input type="date" name="date" required>
+            <input type="text" name="title" placeholder="Titulo da anotacao" required>
+            <textarea name="description" rows="5" placeholder="Escreva a anotacao"></textarea>
+            <div class="calendar-note-form-actions">
+                <button type="submit">Salvar</button>
+                <button type="button" class="calendar-note-cancel" id="cancel-note">Cancelar</button>
+            </div>
+        </form>
+    </section>
+
+    <div id="notes-status" class="calendar-status" role="status"></div>
+    <section id="notes-list" class="notes-date-list" aria-live="polite"></section>
+</main>
+
+<script>
+(() => {
+    const list = document.getElementById('notes-list');
+    const status = document.getElementById('notes-status');
+    const editor = document.getElementById('notes-editor');
+    const editorTitle = document.getElementById('notes-editor-title');
+    const form = document.getElementById('note-form');
+    let editingId = null;
+
+    function todayIso() {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+
+    function formatDate(value) {
+        const [year, month, day] = value.split('-');
+        return `${day}/${month}/${year}`;
+    }
+
+    function formatDateTime(value) {
+        if (!value) return '';
+        const [date, time = ''] = String(value).split(' ');
+        return `${formatDate(date)} as ${time.slice(0, 5)}`;
+    }
+
+    function makeElement(tag, className, text) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        if (text !== undefined) element.textContent = text;
+        return element;
+    }
+
+    async function fetchJson(url, options = {}) {
+        const response = await fetch(url, { credentials: 'same-origin', ...options });
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.toLowerCase().includes('application/json')) {
+            throw new Error(response.redirected || response.url.includes('/login')
+                ? 'Sua sessao expirou. Entre novamente no sistema.'
+                : 'O servidor retornou uma resposta invalida.');
+        }
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.erro || 'Nao foi possivel concluir a solicitacao.');
+        return data;
+    }
+
+    function closeEditor() {
+        editingId = null;
+        form.reset();
+        form.elements.date.disabled = false;
+        editor.hidden = true;
+    }
+
+    function openEditor(note = null) {
+        editingId = note ? note.id : null;
+        editorTitle.textContent = note ? 'Editar anotacao' : 'Nova anotacao';
+        form.elements.date.value = note ? note.date : todayIso();
+        form.elements.date.disabled = Boolean(note);
+        form.elements.title.value = note ? note.title : '';
+        form.elements.description.value = note ? (note.description || '') : '';
+        editor.hidden = false;
+        editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        form.elements.title.focus();
+    }
+
+    function renderNotes(notes) {
+        list.innerHTML = '';
+        if (!notes.length) {
+            list.appendChild(makeElement('div', 'calendar-details-empty', 'Nenhuma anotacao cadastrada.'));
+            return;
+        }
+        const groups = new Map();
+        notes.forEach((note) => {
+            if (!groups.has(note.date)) groups.set(note.date, []);
+            groups.get(note.date).push(note);
+        });
+        groups.forEach((dateNotes, date) => {
+            const group = makeElement('section', 'notes-date-group');
+            group.appendChild(makeElement('h3', '', formatDate(date)));
+            dateNotes.forEach((note) => {
+                const item = makeElement('article', 'calendar-note-item');
+                item.appendChild(makeElement('strong', '', note.title));
+                const description = makeElement('p', 'calendar-note-description', note.description || '');
+                item.appendChild(description);
+                if ((note.description || '').length > 260) {
+                    description.classList.add('calendar-note-collapsed');
+                    const toggle = makeElement('button', 'calendar-note-toggle', 'Ver mais');
+                    toggle.type = 'button';
+                    toggle.addEventListener('click', () => {
+                        const collapsed = description.classList.toggle('calendar-note-collapsed');
+                        toggle.textContent = collapsed ? 'Ver mais' : 'Ver menos';
+                    });
+                    item.appendChild(toggle);
+                }
+                item.appendChild(makeElement('small', '', `Atualizada ${formatDateTime(note.updated_at)}`));
+                const actions = makeElement('div', 'calendar-note-actions');
+                const edit = makeElement('button', '', 'Editar');
+                edit.type = 'button';
+                edit.addEventListener('click', () => openEditor(note));
+                const remove = makeElement('button', 'calendar-note-delete', 'Excluir');
+                remove.type = 'button';
+                remove.addEventListener('click', () => deleteNote(note.id));
+                actions.append(edit, remove);
+                item.appendChild(actions);
+                group.appendChild(item);
+            });
+            list.appendChild(group);
+        });
+    }
+
+    async function loadNotes() {
+        status.textContent = 'Carregando anotacoes...';
+        try {
+            const data = await fetchJson('/calendar_notes');
+            renderNotes(data.notes || []);
+            status.textContent = '';
+        } catch (error) {
+            status.textContent = error.message;
+        }
+    }
+
+    async function deleteNote(noteId) {
+        if (!confirm('Excluir esta anotacao?')) return;
+        try {
+            await fetchJson(`/calendar_notes/${noteId}/delete`, { method: 'POST' });
+            closeEditor();
+            await loadNotes();
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const submit = form.querySelector('button[type="submit"]');
+        submit.disabled = true;
+        submit.textContent = 'Salvando...';
+        try {
+            await fetchJson(editingId ? `/calendar_notes/${editingId}` : '/calendar_notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    date: form.elements.date.value,
+                    title: form.elements.title.value,
+                    description: form.elements.description.value
+                })
+            });
+            closeEditor();
+            await loadNotes();
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            submit.disabled = false;
+            submit.textContent = 'Salvar';
+        }
+    });
+
+    document.getElementById('new-note').addEventListener('click', () => openEditor());
+    document.getElementById('cancel-note').addEventListener('click', closeEditor);
+    if (new URLSearchParams(window.location.search).get('nova') === '1') openEditor();
+    loadNotes();
+})();
+</script>
+</body>
+</html>
