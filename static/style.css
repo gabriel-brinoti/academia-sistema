@@ -1106,6 +1106,91 @@ tr:hover td {
     border-bottom: 0;
 }
 
+.experimental-students-section {
+    margin: 22px 0;
+    padding: 18px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.experimental-students-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.experimental-students-heading h3,
+.experimental-students-heading p {
+    margin: 0;
+}
+
+.experimental-students-heading p {
+    margin-top: 4px;
+    color: #666;
+}
+
+.experimental-students-heading > span {
+    min-width: 38px;
+    padding: 8px;
+    border-radius: 6px;
+    background: #111;
+    color: #f4b400;
+    font-weight: bold;
+    text-align: center;
+}
+
+.experimental-students-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.experimental-student-card {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid #e1e1e1;
+    border-radius: 8px;
+    background: #fafafa;
+}
+
+.experimental-student-card > strong,
+.experimental-student-card > small {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
+.experimental-student-card > small {
+    margin-top: 4px;
+    color: #666;
+}
+
+.experimental-student-bookings {
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.experimental-student-bookings > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 6px;
+    border-top: 1px solid #e5e5e5;
+}
+
+.experimental-student-bookings span {
+    overflow-wrap: anywhere;
+    text-align: right;
+}
+
+.experimental-students-empty {
+    margin: 0;
+    color: #666;
+}
+
 @media (max-width: 600px) {
     .calendar-page-heading { align-items: stretch; flex-direction: column; }
     .calendar-page-heading .btn { width: 100%; text-align: center; }
@@ -1131,4 +1216,8 @@ tr:hover td {
     .experimental-cancel,
     .experimental-add,
     .experimental-form-actions button { width: 100%; }
+    .experimental-students-heading { align-items: flex-start; }
+    .experimental-students-grid { grid-template-columns: 1fr; }
+    .experimental-student-bookings > div { align-items: flex-start; flex-direction: column; gap: 2px; }
+    .experimental-student-bookings span { text-align: left; }
 }

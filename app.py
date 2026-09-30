@@ -2106,10 +2106,55 @@ def alunos():
 
     preencher_resumo_aulas_lista(cursor, alunos)
 
+    experimentais = []
+    if not status:
+        parametros_experimentais = [data_hoje_brasil().strftime("%Y-%m-%d")]
+        filtro_busca_experimental = ""
+        if busca:
+            filtro_busca_experimental = "AND eb.nome ILIKE %s"
+            parametros_experimentais.append(f"%{busca}%")
+
+        cursor.execute(f"""
+            SELECT
+                eb.id,
+                eb.nome,
+                eb.telefone,
+                eb.data_agendamento,
+                a.modalidade,
+                a.horario
+            FROM experimental_bookings eb
+            JOIN aulas a ON a.id = eb.aula_id
+            WHERE COALESCE(eb.status, 'ATIVO') = 'ATIVO'
+              AND eb.data_agendamento >= %s
+              {filtro_busca_experimental}
+            ORDER BY eb.nome ASC, eb.data_agendamento ASC, a.horario ASC
+        """, tuple(parametros_experimentais))
+
+        experimentais_agrupados = {}
+        for experimental in cursor.fetchall():
+            chave = (
+                " ".join(str(experimental["nome"] or "").lower().split()),
+                " ".join(str(experimental["telefone"] or "").split())
+            )
+            if chave not in experimentais_agrupados:
+                experimentais_agrupados[chave] = {
+                    "nome": experimental["nome"],
+                    "telefone": experimental["telefone"],
+                    "agendamentos": []
+                }
+            experimentais_agrupados[chave]["agendamentos"].append({
+                "id": experimental["id"],
+                "data": experimental["data_agendamento"],
+                "modalidade": experimental["modalidade"],
+                "horario": experimental["horario"]
+            })
+        experimentais = list(experimentais_agrupados.values())
+
     conn.close()
     return render_template(
         "alunos.html",
         alunos=alunos,
+        experimentais=experimentais,
         busca=busca,
         status=status,
         calcular_idade=calcular_idade,

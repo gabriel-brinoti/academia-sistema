@@ -2,6 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Alunos - DL Fit</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icon-180.png') }}">
@@ -41,6 +42,39 @@
    onclick="return confirm('Tem certeza que deseja excluir TODOS os alunos e agendamentos? Essa ação não pode ser desfeita.')">
    Excluir todos os alunos
 </a>
+
+    {% if not status %}
+    <section class="experimental-students-section">
+        <div class="experimental-students-heading">
+            <div>
+                <h3>Alunos experimentais</h3>
+                <p>Experimentais com agendamentos ativos de hoje em diante.</p>
+            </div>
+            <span>{{ experimentais|length }}</span>
+        </div>
+        {% if experimentais %}
+        <div class="experimental-students-grid">
+            {% for experimental in experimentais %}
+            <article class="experimental-student-card">
+                <strong>{{ experimental.nome }}</strong>
+                <small>{{ experimental.telefone or 'Telefone nao informado' }}</small>
+                <div class="experimental-student-bookings">
+                    {% for agendamento in experimental.agendamentos %}
+                    <div>
+                        <b>{{ formatar_data_brasil(agendamento.data) }}</b>
+                        <span>{{ agendamento.horario }} - {{ agendamento.modalidade }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="experimental-students-empty">Nenhum experimental agendado.</p>
+        {% endif %}
+    </section>
+    {% endif %}
+
     <table>
         <tr>
             <th>Nome</th>
