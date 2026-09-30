@@ -578,9 +578,28 @@ tr:hover td {
     font-size: 18px;
 }
 
-.calendar-schedule-list {
+.calendar-schedule-columns {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.calendar-schedule-column {
+    min-width: 0;
+}
+
+.calendar-schedule-column-title {
+    margin: 0 0 12px;
+    padding: 12px;
+    border-radius: 8px;
+    background: #111;
+    color: #f4b400;
+    font-size: 18px;
+    text-align: center;
+}
+
+.calendar-schedule-list {
+    display: grid;
     gap: 10px;
 }
 
@@ -1092,7 +1111,7 @@ tr:hover td {
     .calendar-page-heading .btn { width: 100%; text-align: center; }
     .calendar-panel { padding: 14px 10px; }
     .calendar-selection { padding: 14px 10px; }
-    .calendar-schedule-list { grid-template-columns: 1fr; }
+    .calendar-schedule-columns { grid-template-columns: 1fr; }
     .calendar-header { align-items: flex-start; flex-direction: column; gap: 10px; }
     .calendar-controls { justify-content: space-between; width: 100%; }
     .calendar-day { min-height: 42px; }

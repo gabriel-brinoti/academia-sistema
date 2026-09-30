@@ -191,7 +191,16 @@
             return;
         }
 
-        const list = makeElement('div', 'calendar-schedule-list');
+        const list = makeElement('div', 'calendar-schedule-columns');
+        const musculacaoColumn = makeElement('section', 'calendar-schedule-column');
+        const aulasColumn = makeElement('section', 'calendar-schedule-column');
+        musculacaoColumn.appendChild(makeElement('h5', 'calendar-schedule-column-title', 'Musculacao'));
+        aulasColumn.appendChild(makeElement('h5', 'calendar-schedule-column-title', 'Aulas'));
+        const musculacaoList = makeElement('div', 'calendar-schedule-list');
+        const aulasList = makeElement('div', 'calendar-schedule-list');
+        let musculacaoCount = 0;
+        let aulasCount = 0;
+
         classes.forEach((aula) => {
             const item = makeElement('article', `calendar-schedule-item${aula.is_blocked ? ' is-blocked' : ''}`);
             const heading = makeElement('div', 'calendar-schedule-heading');
@@ -234,8 +243,24 @@
                 action.appendChild(add);
                 item.appendChild(action);
             }
-            list.appendChild(item);
+            if (String(aula.modalidade).toUpperCase() === 'MUSCULACAO') {
+                musculacaoList.appendChild(item);
+                musculacaoCount += 1;
+            } else {
+                aulasList.appendChild(item);
+                aulasCount += 1;
+            }
         });
+
+        if (!musculacaoCount) {
+            musculacaoList.appendChild(makeElement('div', 'calendar-details-empty', 'Nao ha horarios de musculacao neste dia.'));
+        }
+        if (!aulasCount) {
+            aulasList.appendChild(makeElement('div', 'calendar-details-empty', 'Nao ha aulas coletivas neste dia.'));
+        }
+        musculacaoColumn.appendChild(musculacaoList);
+        aulasColumn.appendChild(aulasList);
+        list.append(musculacaoColumn, aulasColumn);
         container.appendChild(list);
     }
 
