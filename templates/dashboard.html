@@ -172,7 +172,7 @@
 
             <div class="lista-alunos-aula">
                 <h4>Alunos inscritos nesta aula</h4>
-                {% if aula.inscritos %}
+                {% if aula.inscritos or aula.experimentais %}
                     <ul>
                         {% for inscrito in aula.inscritos %}
                             <li>
@@ -186,6 +186,14 @@
                                    onclick="return confirm('Remover este aluno da aula?')">
                                     Remover
                                 </a>
+                            </li>
+                        {% endfor %}
+                        {% for experimental in aula.experimentais %}
+                            <li>
+                                <span>
+                                    {{ experimental.nome }}
+                                    <strong class="experimental-badge">Experimental</strong>
+                                </span>
                             </li>
                         {% endfor %}
                     </ul>

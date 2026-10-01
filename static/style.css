@@ -394,6 +394,18 @@ tr:hover td {
     text-decoration: none;
 }
 
+.experimental-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #fff3cd;
+    color: #805b00;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    vertical-align: middle;
+}
+
 .pago { color: #1f9d55; font-weight: bold; }
 .pendente { color: #d48b00; font-weight: bold; }
 .atrasado { color: #d62828; font-weight: bold; }
