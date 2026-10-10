@@ -1960,7 +1960,10 @@ def bloqueio_aulas():
     conn = None
     cursor = None
 
-    if tipo == "AULAS":
+    if tipo == "TODAS":
+        horario_inicio = "00:00"
+        horario_fim = ""
+    elif tipo == "AULAS":
         if not aula_bloqueio_id:
             return redirect(url_for("dashboard"))
         conn = conectar()

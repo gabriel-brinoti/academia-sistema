@@ -51,11 +51,12 @@
     {% if bloqueio_aulas_ativo %}
     <div class="admin-panel">
         <h3>Bloquear aulas por fechamento especial</h3>
-        <p class="subtitulo">Para aulas, escolha a aula especifica. Para musculacao, informe o horario inicial e, se quiser, o horario final.</p>
+        <p class="subtitulo">Use Dia inteiro para feriados e fechamentos. Para aulas, escolha a aula especifica. Para musculacao, informe o horario inicial e, se quiser, o horario final.</p>
         <form method="POST" action="{{ url_for('bloqueio_aulas') }}" class="inline-form">
             <div class="form-field">
                 <label>Bloquear</label>
                 <select name="tipo_bloqueio" id="tipo_bloqueio">
+                    <option value="TODAS">Dia inteiro</option>
                     <option value="AULAS">Aulas</option>
                     <option value="MUSCULACAO">Musculacao</option>
                 </select>
@@ -99,7 +100,9 @@
             {% for bloqueio in bloqueios_aulas %}
             <div class="bloqueio-item">
                 <span>
-                    {% if bloqueio.tipo == 'AULAS' %}
+                    {% if bloqueio.tipo == 'TODAS' %}
+                        Dia inteiro -
+                    {% elif bloqueio.tipo == 'AULAS' %}
                         Aulas -
                     {% elif bloqueio.tipo == 'MUSCULACAO' %}
                         Musculacao -
@@ -109,7 +112,9 @@
                         Todas -
                     {% endif %}
                     {{ bloqueio.data_bloqueio[8:10] }}/{{ bloqueio.data_bloqueio[5:7] }}/{{ bloqueio.data_bloqueio[0:4] }}
-                    {% if bloqueio.tipo == 'MODALIDADE' %}
+                    {% if bloqueio.tipo == 'TODAS' %}
+                        (dia todo)
+                    {% elif bloqueio.tipo == 'MODALIDADE' %}
                         as {{ bloqueio.horario_inicio }}
                     {% else %}
                         de {{ bloqueio.horario_inicio }}
@@ -274,11 +279,12 @@
     function atualizarCamposBloqueio() {
         if (!tipoBloqueio) return;
         const bloqueiaMusculacao = tipoBloqueio.value === 'MUSCULACAO';
-        if (campoAulaBloqueio) campoAulaBloqueio.style.display = bloqueiaMusculacao ? 'none' : '';
+        const bloqueiaAula = tipoBloqueio.value === 'AULAS';
+        if (campoAulaBloqueio) campoAulaBloqueio.style.display = bloqueiaAula ? '' : 'none';
         camposHorarioBloqueio.forEach((campo) => {
             campo.style.display = bloqueiaMusculacao ? '' : 'none';
         });
-        if (aulaBloqueio) aulaBloqueio.required = !bloqueiaMusculacao;
+        if (aulaBloqueio) aulaBloqueio.required = bloqueiaAula;
         if (horarioInicioBloqueio) horarioInicioBloqueio.required = bloqueiaMusculacao;
     }
 
